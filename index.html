@@ -1,0 +1,1851 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Lector Xteink Firmware</title>
+<script>
+  (()=>{
+    let saved=null;
+    try{saved=localStorage.getItem("lector-theme");}catch(_e){}
+    const theme=saved==="light"||saved==="dark"
+      ? saved
+      : (matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light");
+    document.documentElement.dataset.theme=theme;
+    document.documentElement.style.colorScheme=theme;
+  })();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Archivo+Black&family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --paper:#ffffff; --panel:#ffffff; --ink:#111111; --text:#1a1a1a;
+    --sub:#666666; --soft:#e5e5e5; --dash:#cfcfcf; --code:#f2f2f2;
+    --red:#8a1c1c; --yellow:#ededed; --yellow-soft:#f4f4f4; --on-red:#ffffff;
+    --on-ink:#ffffff; --accent-ink:#111111;
+    --hero-bg:#111111; --hero-text:#ffffff; --hero-sub:#bdbdbd;
+    --sans:'Archivo','Helvetica Neue',system-ui,sans-serif;
+    --serif:'Newsreader',Georgia,'Times New Roman',serif;
+    --mono:'JetBrains Mono',ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+    --black:'Archivo Black','Archivo',sans-serif;
+  }
+  :root[data-theme="dark"]{
+    --paper:#0a0a0a; --panel:#111111; --ink:#f2f2f2; --text:#f2f2f2;
+    --sub:#a6a6a6; --soft:#2a2a2a; --dash:#3a3a3a; --code:#1a1a1a;
+    --red:#b83427; --yellow:#2a2a2a; --yellow-soft:#1a1a1a; --on-red:#f2f2f2;
+    --on-ink:#0a0a0a; --accent-ink:#f2f2f2;
+    --hero-bg:#161616; --hero-text:#f2f2f2; --hero-sub:#a6a6a6;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{background:var(--paper);color:var(--text);font-family:var(--sans);line-height:1.45;
+    -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;}
+  ::selection{background:var(--yellow);color:var(--accent-ink);}
+  a{color:var(--ink);}
+  .wrap{max-width:1180px;margin:0 auto;padding:26px 24px 90px;}
+  .mono{font-family:var(--mono);}
+  code{font-family:var(--mono);background:var(--code);border:1px solid var(--ink);border-radius:2px;padding:1px 5px;}
+
+  /* ---- header ---- */
+  .topline{display:flex;justify-content:space-between;align-items:center;font-family:var(--mono);
+    font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--sub);font-weight:500;
+    padding-bottom:8px;}
+  .topline-right{display:flex;align-items:center;gap:14px;}
+  .theme-toggle{appearance:none;display:grid;place-items:center;width:30px;height:30px;padding:0;
+    border:2px solid var(--ink);border-radius:50%;background:var(--panel);color:var(--ink);
+    cursor:pointer;box-shadow:2px 2px 0 var(--ink);}
+  .theme-toggle:hover{background:var(--yellow);color:var(--accent-ink);}
+  .theme-toggle:focus-visible{outline:3px solid var(--red);outline-offset:3px;}
+  .theme-toggle svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;
+    stroke-linecap:round;stroke-linejoin:round;}
+  .theme-toggle .icon-sun{display:none;}
+  :root[data-theme="dark"] .theme-toggle .icon-sun{display:block;}
+  :root[data-theme="dark"] .theme-toggle .icon-moon{display:none;}
+  .rule-thin{border-top:3px solid var(--ink);border-bottom:1px solid var(--ink);height:3px;}
+  .rule{border-top:3px solid var(--ink);}
+  .masthead{display:flex;align-items:center;gap:20px;padding:18px 0 14px;}
+  .masthead h1{font-family:var(--serif);font-weight:600;font-size:40px;line-height:1;
+    letter-spacing:-.02em;color:var(--ink);margin:0;}
+  .masthead p{margin:8px 0 0;color:var(--sub);font-size:14.5px;max-width:64ch;}
+
+  /* ---- tabs ---- */
+  .tabs{display:inline-flex;margin-top:22px;border:3px solid var(--ink);border-radius:6px;
+    overflow:hidden;background:var(--paper);box-shadow:4px 4px 0 0 var(--ink);}
+  .tab{appearance:none;border:0;background:transparent;color:var(--ink);font-family:var(--sans);
+    font-size:15px;font-weight:800;letter-spacing:.01em;padding:11px 26px;cursor:pointer;}
+  .tab:not(:last-child){border-right:3px solid var(--ink);}
+  .tab.on{background:var(--ink);color:var(--on-ink);}
+
+  /* ---- panels & controls ---- */
+  .panel{background:var(--panel);border:3px solid var(--ink);box-shadow:6px 6px 0 0 var(--ink);
+    border-radius:6px;padding:20px;margin-top:24px;}
+  .panel.drop-panel{margin-top:26px;}
+  .controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:18px;}
+  .ctl label{display:block;font-family:var(--mono);font-size:11px;letter-spacing:.12em;
+    text-transform:uppercase;color:var(--sub);margin-bottom:8px;font-weight:500;}
+  .ctl label .paren{text-transform:none;font-family:var(--mono);}
+  .seg{display:flex;border:3px solid var(--ink);border-radius:5px;overflow:hidden;background:var(--paper);}
+  .seg button{flex:1;border:0;background:transparent;color:var(--ink);padding:9px 4px;
+    font-family:var(--sans);font-weight:700;font-size:12.5px;cursor:pointer;}
+  .seg button:not(:last-child){border-right:3px solid var(--ink);}
+  .seg button.on{background:var(--ink);color:var(--on-ink);}
+  select{width:100%;padding:9px 8px;border:3px solid var(--ink);border-radius:5px;background:var(--paper);
+    color:var(--ink);font-size:13px;font-family:var(--sans);font-weight:600;cursor:pointer;}
+  /* A note that opens its panel has no controls above it to be divided from. */
+  .note.note-lead{margin-top:0;padding-top:0;border-top:0;}
+  .note{margin-top:16px;padding-top:14px;border-top:1px solid var(--soft);color:var(--sub);
+    font-size:12.5px;line-height:1.5;}
+  .note strong{color:var(--ink);}
+
+  /* ---- drop zone ---- */
+  .drop{border:3px dashed var(--dash);border-radius:6px;padding:40px 20px;text-align:center;
+    cursor:pointer;background:transparent;
+    transition:border-color .16s cubic-bezier(.32,.72,.12,1),background .16s;}
+  .drop:hover,.drop.over{border-color:var(--red);background:var(--yellow-soft);}
+  .drop .big{font-family:var(--serif);font-size:24px;font-weight:600;color:var(--ink);letter-spacing:-.01em;}
+  .drop .big span{font-family:var(--sans);font-size:15px;font-weight:600;color:var(--sub);}
+  .drop .sub{color:var(--sub);font-size:13px;margin-top:8px;}
+
+  /* ---- results bar ---- */
+  .bar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:18px;}
+  .bar[hidden]{display:none;}
+  .btn{border:3px solid var(--ink);border-radius:6px;padding:10px 18px;font-size:14px;font-weight:800;
+    cursor:pointer;font-family:var(--sans);box-shadow:4px 4px 0 0 var(--ink);}
+  .btn-red{background:var(--red);color:var(--on-red);}
+  .btn-ghost{background:transparent;color:var(--ink);}
+  .count{color:var(--sub);font-size:13px;font-family:var(--mono);letter-spacing:.04em;}
+  .download-progress{width:100%;margin-top:14px;border:3px solid var(--ink);border-radius:6px;
+    background:var(--paper);box-shadow:4px 4px 0 0 var(--ink);overflow:hidden;}
+  .download-progress[hidden]{display:none;}
+  .download-progress-head{display:flex;justify-content:space-between;gap:12px;padding:8px 10px;
+    border-bottom:3px solid var(--ink);background:var(--yellow-soft);color:var(--ink);
+    font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;}
+  .download-progress-track{position:relative;height:22px;background:
+    repeating-linear-gradient(90deg,var(--panel) 0 10px,var(--paper) 10px 20px);}
+  .download-progress-fill{height:100%;width:0;background:
+    repeating-linear-gradient(45deg,var(--red) 0 9px,var(--yellow) 9px 18px);
+    border-right:3px solid var(--ink);transition:width .18s steps(6,end);}
+  .download-progress.done .download-progress-fill{background:var(--ink);}
+  .download-progress.done .download-progress-head{background:var(--ink);color:var(--on-ink);}
+  .results{margin-top:20px;display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:20px;}
+
+  /* ---- result card ---- */
+  .card{background:var(--paper);border:3px solid var(--ink);border-radius:6px;padding:12px;
+    box-shadow:4px 4px 0 0 var(--ink);}
+  .card canvas{width:100%;height:auto;image-rendering:pixelated;border:2px solid var(--ink);
+    background:#fff;display:block;border-radius:2px;}
+  .card .name{font-family:var(--mono);font-size:12px;margin:10px 0 6px;word-break:break-all;color:var(--text);}
+  .card .meta{display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-family:var(--mono);
+    font-size:11px;color:var(--sub);}
+  .pill{border-radius:999px;padding:1px 9px;font-size:10.5px;font-weight:700;}
+  .pill-toggle{background:var(--yellow-soft);color:var(--ink);border:2px solid var(--ink);
+    font-family:var(--sans);cursor:pointer;}
+  .pill-src{background:var(--code);border:2px solid var(--ink);color:var(--sub);}
+  .card a.dl{display:block;text-align:center;margin-top:12px;background:var(--red);color:var(--on-red);
+    text-decoration:none;padding:9px;border:3px solid var(--ink);border-radius:6px;font-size:13px;
+    font-weight:800;font-family:var(--sans);box-shadow:4px 4px 0 0 var(--ink);}
+
+  /* ---- how it works ---- */
+  details{margin-top:24px;border:3px solid var(--ink);border-radius:6px;background:var(--panel);
+    box-shadow:4px 4px 0 0 var(--ink);padding:16px 18px;}
+  summary{cursor:pointer;font-family:var(--sans);font-size:15px;font-weight:800;color:var(--ink);}
+  details p{color:var(--sub);font-size:13.5px;margin:12px 0 0;}
+  details ul{color:var(--sub);font-size:13.5px;padding-left:20px;margin:12px 0 0;line-height:1.55;}
+  details strong{color:var(--ink);}
+  details .foot{font-family:var(--mono);color:var(--sub);font-size:12px;margin:12px 0 0;letter-spacing:.04em;}
+
+  /* ---- gallery hero ---- */
+  .hero{position:relative;background:var(--hero-bg);color:var(--hero-text);border-radius:6px;
+    padding:26px 24px;margin-top:24px;overflow:hidden;}
+  .hero .tex{position:absolute;inset:0;background-image:url("data:image/svg+xml,%3Csvg xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22 width%3D%22240%22 height%3D%22240%22 viewBox%3D%220 0 240 240%22%3E %3Cfilter id%3D%22g%22%3E %3CfeTurbulence type%3D%22fractalNoise%22 baseFrequency%3D%220.92%22 numOctaves%3D%222%22 seed%3D%227%22 stitchTiles%3D%22stitch%22%3E%3C%2FfeTurbulence%3E %3CfeColorMatrix values%3D%220 0 0 0 0%26%23xA%3B                           0 0 0 0 0%26%23xA%3B                           0 0 0 0 0%26%23xA%3B                           0 0 0 0.55 0%22%3E%3C%2FfeColorMatrix%3E %3C%2Ffilter%3E %3Crect width%3D%22100%25%22 height%3D%22100%25%22 filter%3D%22url(%23g)%22%3E%3C%2Frect%3E %3C%2Fsvg%3E");background-size:240px 240px;
+    opacity:.16;mix-blend-mode:screen;pointer-events:none;}
+  .hero .in{position:relative;}
+  .hero .label{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;
+    color:var(--yellow);font-weight:500;margin-bottom:10px;}
+  .hero h2{font-family:var(--black);font-weight:900;font-size:44px;line-height:.94;letter-spacing:-.02em;
+    color:var(--hero-text);margin:0;}
+  .hero p{color:var(--hero-sub);font-size:14.5px;max-width:60ch;margin:14px 0 0;}
+  .hero .k{font-family:var(--mono);color:var(--hero-text);}
+
+  /* ---- gallery grid ---- */
+  .gstate{margin-top:22px;color:var(--sub);font-size:14px;text-align:center;padding:34px 12px;
+    border:3px dashed var(--dash);border-radius:6px;background:var(--panel);}
+  .gstate[hidden]{display:none;}
+  .ggrid{margin-top:22px;display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:22px;}
+  .gactions{display:flex;justify-content:center;align-items:center;gap:16px;margin-top:28px;}
+  .gactions[hidden]{display:none;}
+  .gcount{font-family:var(--mono);font-size:12px;color:var(--sub);letter-spacing:.04em;}
+
+  /* ---- gallery card ---- */
+  .gcard{background:var(--panel);border:3px solid var(--ink);border-radius:6px;padding:12px;
+    box-shadow:4px 4px 0 0 var(--ink);opacity:0;animation:lwc-rise .5s cubic-bezier(.2,.7,.3,1) forwards;
+    transition:transform .2s cubic-bezier(.2,.9,.3,1.15),box-shadow .2s,border-color .2s;}
+  .gcard:hover{transform:translate(-3px,-3px);box-shadow:8px 8px 0 0 var(--ink);border-color:var(--red);}
+  .gframe{position:relative;border:3px solid var(--ink);border-radius:4px;overflow:hidden;background:#fff;line-height:0;}
+  .gframe canvas{width:100%;height:auto;image-rendering:pixelated;display:block;
+    transition:transform .5s cubic-bezier(.2,.7,.3,1);}
+  .gcard:hover .gframe canvas{transform:scale(1.05);}
+  .gsize{position:absolute;top:10px;left:10px;background:var(--yellow);color:var(--accent-ink);
+    font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.02em;line-height:1.5;
+    padding:5px 11px;border:2px solid var(--accent-ink);border-radius:999px;}
+  .gtitle{font-family:var(--serif);font-weight:600;font-size:19px;letter-spacing:-.01em;color:var(--ink);margin:12px 0 1px;}
+  .gcredit{font-family:var(--mono);font-size:11px;color:var(--sub);margin-bottom:12px;}
+  .gdl-main{display:block;width:100%;text-align:center;background:var(--red);color:var(--on-red);text-decoration:none;
+    border:3px solid var(--ink);border-radius:6px;padding:9px;font-size:13px;font-weight:800;
+    font-family:var(--sans);box-shadow:4px 4px 0 0 var(--ink);cursor:pointer;letter-spacing:.02em;}
+  .gdl-alt{display:flex;gap:7px;margin-top:9px;}
+  .gdl-alt button{flex:1;border:2px solid var(--ink);background:var(--paper);color:var(--text);
+    font-family:var(--mono);font-size:10.5px;font-weight:700;padding:6px 2px;border-radius:5px;
+    cursor:pointer;transition:background .14s,color .14s;}
+  .gdl-alt button:hover{background:var(--yellow);color:var(--accent-ink);}
+
+  /* ---- flasher tab ---- */
+  #view-flash .panel{padding:24px;}
+  .verline{font-family:var(--mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;
+    color:var(--sub);font-weight:500;margin-bottom:6px;}
+  .verval{font-family:var(--serif);font-size:30px;font-weight:600;color:var(--ink);line-height:1;
+    letter-spacing:-.01em;}
+  .verval .dim{color:var(--sub);}
+  #view-flash .actions{display:flex;flex-direction:column;gap:10px;align-items:flex-start;margin-top:22px;}
+  #view-flash .btn{padding:14px 26px;font-size:16px;box-shadow:5px 5px 0 0 var(--ink);
+    transition:transform .08s cubic-bezier(.32,.72,.12,1),box-shadow .08s;}
+  #view-flash .btn:active{transform:translate(2px,2px);box-shadow:2px 2px 0 0 var(--ink);}
+  #view-flash .btn-ghost{padding:10px 18px;font-size:13.5px;box-shadow:4px 4px 0 0 var(--ink);}
+  esp-web-install-button{--esp-tools-button-color:var(--on-red);}
+  .fallback{font-family:var(--mono);font-size:12.5px;color:var(--red);font-weight:600;}
+  .rescue{margin-top:30px;padding-top:22px;border-top:3px dashed var(--dash);}
+  .rescue h3{font-family:var(--sans);font-size:14px;font-weight:800;letter-spacing:.02em;
+    text-transform:uppercase;color:var(--ink);margin:0 0 6px;}
+  .rescue p{color:var(--sub);font-size:13px;margin:0 0 14px;max-width:60ch;line-height:1.5;}
+  .warn{background:var(--yellow-soft);border:2px solid var(--ink);border-radius:5px;padding:10px 12px;
+    color:var(--ink);font-size:12.5px;line-height:1.5;margin:0 0 14px;max-width:60ch;}
+  .warn strong{font-weight:800;}
+  .steps{list-style:none;counter-reset:s;padding:0;margin:0;display:grid;gap:12px;}
+  .steps li{counter-increment:s;position:relative;padding-left:40px;color:var(--text);font-size:14px;line-height:1.5;}
+  .steps li::before{content:counter(s);position:absolute;left:0;top:-1px;width:26px;height:26px;
+    display:grid;place-items:center;background:var(--ink);color:var(--on-ink);border-radius:50%;
+    font-family:var(--mono);font-size:13px;font-weight:700;}
+  .steps strong{color:var(--ink);}
+  .fprog{margin-top:24px;}
+  .fbar{height:14px;border:2px solid var(--ink);border-radius:4px;background:var(--paper);overflow:hidden;}
+  .fbar-fill{height:100%;width:0;background:var(--red);transition:width .2s ease;}
+  .fstatus{margin-top:8px;font-size:12px;color:var(--ink);font-weight:600;}
+  .flog{margin-top:10px;max-height:170px;overflow:auto;background:var(--code);border:2px solid var(--ink);
+    border-radius:4px;padding:8px 10px;font-size:11px;color:var(--sub);white-space:pre-wrap;word-break:break-word;}
+
+  /* ---- footer ---- */
+  footer{margin-top:40px;padding-top:18px;border-top:3px solid var(--ink);color:var(--sub);
+    font-size:12.5px;text-align:center;font-family:var(--mono);letter-spacing:.04em;}
+  footer a{color:var(--ink);font-weight:700;}
+
+  /* ---- motion ---- */
+  @keyframes lwc-rise{from{opacity:0;transform:translateY(18px);}to{opacity:1;transform:none;}}
+  @keyframes lwc-eink{0%{filter:none}10%{filter:invert(1)}22%{filter:invert(1) brightness(.15)}
+    34%{filter:brightness(0)}46%{filter:invert(1)}58%{filter:brightness(0)}
+    70%{filter:invert(1) contrast(1.4)}82%{filter:none}100%{filter:none}}
+  @media (prefers-reduced-motion:reduce){
+    *{animation-duration:.001ms!important;}
+    .gcard{opacity:1;}
+    .gcard:hover{transform:none;}
+    .gframe canvas,.gcard:hover .gframe canvas{transform:none;}
+    .download-progress-fill{transition:none;}
+  }
+  @media (max-width:700px){
+    .wrap{padding:18px 14px 64px;}
+    .topline{align-items:flex-start;gap:10px;}
+    .topline-right{gap:10px;justify-content:flex-end;text-align:right;}
+    .masthead{align-items:flex-start;gap:14px;}
+    .masthead h1{font-size:clamp(30px,9vw,38px);}
+    .masthead p{font-size:13.5px;}
+    .tabs{display:flex;width:100%;margin-top:18px;}
+    .tab{flex:1;padding:12px 6px;font-size:13px;}
+    .panel{padding:16px;box-shadow:4px 4px 0 0 var(--ink);}
+    .controls{grid-template-columns:1fr;gap:14px;}
+    .seg button{min-height:44px;font-size:12px;}
+    select,.btn{min-height:44px;}
+    .drop{padding:28px 14px;}
+    .drop .big{font-size:22px;}
+    .bar{align-items:stretch;}
+    .bar .btn{flex:1 1 140px;}
+    .count{flex-basis:100%;font-size:12px;}
+    .results,.ggrid{grid-template-columns:minmax(0,1fr);gap:16px;}
+    .hero{padding:22px 18px;}
+    .hero h2{font-size:clamp(34px,12vw,44px);}
+    .gactions{flex-wrap:wrap;gap:12px;}
+    .gactions .btn{flex:1 1 130px;}
+    #view-flash .panel{padding:18px;}
+    #view-flash .actions{align-items:stretch;}
+    #view-flash .btn{width:100%;padding:14px 16px;}
+  }
+  @media (max-width:430px){
+    .wrap{padding-left:10px;padding-right:10px;}
+    .topline{font-size:10px;}
+    .masthead{display:block;}
+    .tab{font-size:12px;letter-spacing:0;}
+    .tab:not(:last-child){border-right-width:2px;}
+    .panel,details{border-width:2px;}
+    .download-progress-head{display:block;}
+    .download-progress-percent{display:block;margin-top:3px;}
+  }
+
+  /* ================= LEDGER MONOCHROME SKIN (overrides above; last-wins) =================
+     Matches the reader's web UI: mostly white with a black reverse, thin hairlines,
+     square corners, no hard shadows, bold sans wordmark. Token NAMES are preserved so
+     the palette/theme tests still pass; only their values + a few components change. */
+  /* Flatten: 1px hairlines, no hard shadows, square corners */
+  .tabs,.tab,.panel,.seg,.seg button,select,.drop,.btn,.download-progress,
+  .card,.card canvas,.pill,.pill-toggle,.pill-src,.card a.dl,code,.hero,details{
+    box-shadow:none!important;border-radius:0!important;}
+  .tabs,.panel,.seg,select,.drop,.btn,.card,.card canvas,.download-progress,details{border-width:1px!important;}
+  .tab:not(:last-child),.seg button:not(:last-child){border-right-width:1px!important;}
+  .download-progress-head{border-bottom-width:1px!important;}
+  .download-progress-fill{border-right-width:1px!important;}
+  .pill-toggle,.pill-src{border-width:1px!important;}
+  .theme-toggle{border-width:1px!important;box-shadow:none!important;}
+  .rule,.rule-thin{border-top-width:1px!important;border-bottom-width:0!important;height:0!important;}
+  /* Bold sans wordmark instead of serif */
+  .masthead h1{font-family:var(--black)!important;font-weight:900;letter-spacing:-.01em;}
+  .drop .big{font-family:var(--black)!important;}
+  /* Neutralise the warm accents to monochrome; keep red for the danger action only */
+  ::selection{background:var(--soft)!important;color:var(--ink)!important;}
+  .theme-toggle:hover{background:var(--soft)!important;color:var(--ink)!important;}
+  .drop:hover,.drop.over{border-color:var(--ink)!important;background:var(--code)!important;}
+  .download-progress-head{background:var(--code)!important;color:var(--ink)!important;}
+  .download-progress-track{background:var(--code)!important;}
+  .download-progress-fill{background:var(--ink)!important;}
+  .pill-toggle{background:var(--code)!important;color:var(--ink)!important;}
+  /* Update = primary (black); Rescue/erase = danger (red outline) */
+  #btnUpdate,.btn-red{background:var(--ink)!important;color:var(--on-ink)!important;border-color:var(--ink)!important;}
+  #btnRescue{background:transparent!important;color:var(--red)!important;border-color:var(--red)!important;}
+  .card a.dl{background:var(--ink)!important;color:var(--on-ink)!important;}
+  /* Neutralise remaining serif: bold sans titles, mono version number */
+  .gtitle{font-family:var(--black)!important;}
+  .verval{font-family:var(--mono)!important;font-weight:700;letter-spacing:-.01em;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="topline">
+      <span>Local only — nothing uploaded</span>
+      <span class="topline-right">
+        <span>Est. 2026 · Lector</span>
+        <button class="theme-toggle" id="themeToggle" type="button" aria-label="Switch to dark mode" title="Switch to dark mode">
+          <svg class="icon-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 15.2A8.5 8.5 0 0 1 8.8 4a8.5 8.5 0 1 0 11.2 11.2Z"/></svg>
+          <svg class="icon-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+        </button>
+      </span>
+    </div>
+    <div class="rule-thin"></div>
+    <div class="masthead">
+      <div style="flex:1;min-width:0">
+        <h1>Lector Xteink Firmware</h1>
+        <p>Flash Lector firmware to your Xteink X3 / X4 reader, and turn any image into a sleep wallpaper —
+           all in your browser, nothing uploaded. Use the <strong>Flasher</strong> tab to install firmware and
+           the <strong>Converter</strong> tab for wallpapers.</p>
+        <p>Source code, release notes and downloadable builds:
+           <a href="https://github.com/diogo7dias/lector" target="_blank" rel="noopener">github.com/diogo7dias/lector</a></p>
+      </div>
+    </div>
+    <div class="rule"></div>
+  </header>
+
+  <nav class="tabs" id="tabs" role="tablist" aria-label="Views">
+    <button class="tab on" data-view="convert" role="tab" aria-selected="true">Converter</button>
+    <button class="tab" data-view="clean" role="tab" aria-selected="false">Cleaner</button>
+    <button class="tab" data-view="gallery" role="tab" aria-selected="false">Gallery</button>
+    <button class="tab" data-view="flash" role="tab" aria-selected="false">Flasher</button>
+  </nav>
+
+  <!-- ======================= CONVERTER ======================= -->
+  <section id="view-convert" role="tabpanel">
+    <div class="panel">
+      <div class="controls">
+        <div class="ctl">
+          <label>Screen</label>
+          <div class="seg" id="segSize">
+            <button data-w="480" data-h="800">X4 · 480×800</button>
+            <button data-w="528" data-h="792" class="on">X3 · 528×792</button>
+          </div>
+        </div>
+        <div class="ctl">
+          <label>Format</label>
+          <div class="seg" id="segFmt">
+            <button data-fmt="pxc" class="on">PXC</button>
+            <button data-fmt="bmp">BMP</button>
+          </div>
+        </div>
+        <div class="ctl">
+          <label>Fit</label>
+          <select id="fit">
+            <option value="stretch" selected>Stretch (fill, distort)</option>
+            <option value="cover">Cover (fill + crop)</option>
+            <option value="fit">Fit (letterbox)</option>
+          </select>
+        </div>
+        <div class="ctl">
+          <label>Rendering</label>
+          <select id="mode">
+            <option value="auto">Auto (detect per image)</option>
+            <option value="dither">Dither (photos)</option>
+            <option value="threshold" selected>Threshold (line art)</option>
+          </select>
+        </div>
+        <div class="ctl">
+          <label>Auto-contrast</label>
+          <div class="seg" id="segContrast">
+            <button data-v="1" class="on">On</button>
+            <button data-v="0">Off</button>
+          </div>
+        </div>
+        <div class="ctl">
+          <label>Invert <span class="paren">(neg.)</span></label>
+          <div class="seg" id="segInvert">
+            <button data-v="0" class="on">Off</button>
+            <button data-v="1">On</button>
+          </div>
+        </div>
+      </div>
+      <div class="note">Files must match your screen within 1&nbsp;px or the device rejects them, so pick the
+        size that matches your reader. On device: set <strong>Sleep Screen = Custom</strong> and
+        <strong>Wallpaper Format</strong> to match, then drop the files in <code>/sleep</code>.</div>
+    </div>
+
+    <div class="panel drop-panel">
+      <div class="drop" id="drop">
+        <div class="big">Drop images here <span>or click to choose</span></div>
+        <div class="sub">PNG · JPG · WebP · GIF · BMP · PXC — pick as many as you like. Drop an existing
+          <code>.pxc</code> to re-target it to the other screen.</div>
+        <input type="file" id="file" accept="image/*,.pxc" multiple hidden />
+      </div>
+      <div class="bar" id="bar" hidden>
+        <button class="btn btn-red" id="dlAll">Download all</button>
+        <button class="btn btn-ghost" id="clear">Clear</button>
+        <span class="count" id="count"></span>
+        <div class="download-progress" id="downloadProgress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" hidden>
+          <div class="download-progress-head">
+            <span id="downloadProgressText">Ready to download</span>
+            <span class="download-progress-percent" id="downloadProgressPercent">0%</span>
+          </div>
+          <div class="download-progress-track"><div class="download-progress-fill" id="downloadProgressFill"></div></div>
+        </div>
+      </div>
+      <div class="results" id="results"></div>
+    </div>
+
+    <details>
+      <summary>How it works &amp; the auto settings</summary>
+      <p><strong>PXC</strong> is the device's packed format: a 4-byte little-endian <code>width,height</code>
+        header then 2 bits/pixel (4 gray levels: black · dark · light · white), MSB-first.
+        <strong>BMP</strong> output is a standard 2-bit, 4-gray bitmap the reader also accepts.</p>
+      <ul>
+        <li><strong>Auto rendering</strong> — the tonal range is measured. Photographs get dithering;
+          logos / line art / text get crisp thresholding. Click the <code>dither</code> /
+          <code>threshold</code> badge under any result to flip that one image; changing the Rendering
+          dropdown resets them all.</li>
+        <li><strong>Dithering</strong> — the panel's four levels sit 85 greys apart, so one mis-fired
+          pixel is a whole step away from its neighbours, not a subtle speckle. Three things keep flat
+          areas clean: diffusion is Atkinson, which hands on six eighths of each error so a residual
+          decays instead of building up; the scan alternates direction row by row, which breaks up the
+          diagonal streaks a one-way pass leaves; and a flat area lying close to one of the four levels
+          is placed on that level with its error dropped. Gradients and detail still dither normally, and
+          a tone genuinely between two levels still mixes both.</li>
+        <li><strong>Cleaner</strong> — wallpapers converted before the above will still carry that grit.
+          The <strong>Cleaner</strong> tab repairs finished <code>.pxc</code> and <code>.bmp</code> files
+          in place of re-converting them, so nothing is re-scaled or re-toned. For a whole card, use
+          <code>scripts/clean_pxc.py</code> from the repository.</li>
+        <li><strong>Auto-contrast</strong> — stretches tones to use all four levels so flat images don't
+          come out muddy.</li>
+        <li><strong>Fit</strong> — <em>Cover</em> fills and crops; <em>Fit</em> letterboxes;
+          <em>Stretch</em> distorts to fill.</li>
+        <li><strong>Invert</strong> — only if a wallpaper shows up looking like a photo negative on your panel.</li>
+        <li><strong>Re-target</strong> — drop a <code>.pxc</code> straight in; switch <em>Screen</em> to
+          re-fit and re-encode for the other reader (the badge then reads e.g. <code>X3 → X4</code>).</li>
+        <li><strong>Names</strong> &mdash; a downloaded <code>.pxc</code> is named for the reader it was fitted
+          to, e.g. <code>sunset_X3.pxc</code>. Re-target it and the name follows the new screen.</li>
+      </ul>
+      <p class="foot">All conversion is local (HTML canvas). No server, no upload.</p>
+    </details>
+  </section>
+
+  <!-- ======================= CLEANER ======================= -->
+  <section id="view-clean" role="tabpanel" hidden>
+    <div class="panel">
+      <div class="note note-lead">Already converted a wallpaper and it came out with stray pixels scattered over a
+        flat background? Drop it here. The cleaner reads a finished <code>.pxc</code> or <code>.bmp</code>,
+        fills in the specks that error diffusion left in flat areas, and writes the file back at the
+        same size and format. Nothing is re-scaled and no tone is re-mapped, so the image is otherwise
+        untouched. Detail is kept: a speck is a tiny island of pixels enclosed by one single other
+        level, so a line is safe however thin it is, and cleaning the same file twice changes nothing.</div>
+    </div>
+
+    <div class="panel drop-panel">
+      <div class="drop" id="cleanDrop">
+        <div class="big">Drop converted files here <span>or click to choose</span></div>
+        <div class="sub"><code>.pxc</code> and <code>.bmp</code> — up to about 100 at a time in the browser. For a whole SD card, use
+          <code>scripts/clean_pxc.py</code> from the repository instead.</div>
+        <input type="file" id="cleanFile" accept=".pxc,.bmp,image/bmp" multiple hidden />
+      </div>
+      <div class="bar" id="cleanBar" hidden>
+        <button class="btn btn-red" id="cleanDlAll">Download all</button>
+        <button class="btn btn-ghost" id="cleanClear">Clear</button>
+        <span class="count" id="cleanCount"></span>
+      </div>
+      <div class="results" id="cleanResults"></div>
+    </div>
+  </section>
+
+  <!-- ======================= GALLERY ======================= -->
+  <section id="view-gallery" role="tabpanel" hidden>
+    <div class="hero">
+      <div class="tex"></div>
+      <div class="in">
+        <div class="label">Free · No upload · Ready for your reader</div>
+        <h2>Wallpapers,<br>hand-picked.</h2>
+        <p>Each original <span class="k">PXC</span> master stays byte-for-byte intact and is re-targeted
+          in your browser for <span class="k">X3</span>, <span class="k">X4</span>, or
+          <span class="k">BMP</span>. Nothing leaves your machine.</p>
+      </div>
+    </div>
+    <div class="gstate" id="gstate" hidden></div>
+    <div class="ggrid" id="ggrid"></div>
+    <div class="gactions" id="gactions" hidden>
+      <button class="btn btn-ghost" id="gprev" type="button" hidden>Previous</button>
+      <button class="btn btn-ghost" id="gloadMore" type="button">Load more</button>
+      <span class="gcount" id="gcount" aria-live="polite"></span>
+    </div>
+  </section>
+
+  <!-- ======================= FLASHER ======================= -->
+  <section id="view-flash" role="tabpanel" hidden>
+    <div class="panel">
+      <div class="warn"><strong>Keep a USB cable handy.</strong> Lector is a personal fork with one maintainer, so a
+        build can still carry a bug. If one misbehaves, you can always re-flash from this page.
+        Your books live on the SD card and are never touched. <strong>Update</strong> keeps your settings;
+        a <strong>full install</strong> erases them.</div>
+
+      <h3>Lector</h3>
+      <p>Lector firmware for your Xteink X3 / X4, re-based onto the upstream CrossPoint reader with a thin
+        layer of reading niceties on top. The build on this site is <strong>lector 0.11.1</strong>. Use
+        <strong>Update my reader</strong> if your reader already runs Lector, or the
+        <strong>full install</strong> further down if it does not.</p>
+
+      <div class="verline">Current build on this site</div>
+      <div class="verval"><span id="flashVersion">…</span></div>
+
+      <div class="actions">
+        <button class="btn btn-red" id="btnUpdate" type="button">Update my reader</button>
+      </div>
+      <div class="note"><strong>Update</strong> writes only the app and resets the boot selector. Your books,
+        settings, and Wi-Fi are <strong>kept</strong> — nothing is erased. Your reader must <strong>already be
+        running Lector</strong>. Takes about 30–60 seconds.
+        <br><strong>New device?</strong> If your reader does not have Lector yet, use the
+        <strong>full install</strong> below instead — Update alone will not work on a stock device.
+        <br><strong>What's new — lector 0.9.1:</strong> the reader wakes in half the time, and the wake screen finally names the right book. Reports version <strong>lector 0.9.1</strong> on device.
+        <ul>
+          <li><strong>Unlocking takes half as long.</strong> Waking the reader meant holding the power button for four
+            tenths of a second. It is now two tenths. The wait exists so a knock in a pocket cannot switch the reader
+            on, and two tenths is still far longer than any accidental brush, but short enough that the reader answers
+            a hand that has already decided. You still never need to let go: the reader wakes under your finger the
+            moment the time passes. Holding power to send the reader to sleep uses the same measure, so that is now
+            quicker by the same amount.</li>
+          <li><strong>The wake screen passes twice as quickly.</strong> The banners shown while a book loads were held
+            on screen for a full second at minimum. That is now half a second. It was never an added wait — a book
+            that took a while to load already counted towards it — so this only affects the books that were ready
+            early and left you looking at the banner with nothing happening.</li>
+          <li><strong>"Open a random book on boot" now names the book it is about to open.</strong> The wake screen
+            showed the title of the book you read last, then opened a different one. The reader was choosing the
+            random book after it had already drawn the banner, so the banner could only report what it knew at the
+            time. It now chooses first and draws second, and the choice it draws is the same one it opens. Holding
+            Back to go Home instead still works exactly as before.</li>
+        </ul>
+        <details class="oldrel">
+        <summary>Earlier releases (0.9.0 and back)</summary>
+        <strong>Also in 0.9.0:</strong>
+        <div class="warn"><strong>Your books re-read their layout once</strong> on first open after updating from 0.8.3
+          or earlier, which makes that one open slower. Reading positions and per-book settings are kept.</div>
+        <ul>
+          <li><strong>Twenty-four changes taken from upstream CrossPoint in one go.</strong> This firmware had drifted
+            almost a month behind. Everything upstream had fixed in that time is now here: a dictionary that no longer
+            runs out of memory on compressed definitions, the SD card's power rails shutting down properly on an X3,
+            spaces between Korean words surviving, and the rest. Sixteen files collided during the merge, nearly all of
+            them because the same upstream fix had already been applied here by hand; each was settled by keeping this
+            firmware's feature and folding upstream's mechanism around it.</li>
+          <li><strong>Reading positions are now anchored to the words, not the page number.</strong> Upstream changed
+            how a position is stored so it survives the page being laid out differently — a font change, a margin
+            change, a different reader entirely. Syncing with other reading apps lands in the right place because of
+            it. This is what makes your books re-read their layout once.</li>
+          <li><strong>Touchscreen support, carried in full.</strong> Neither the X3 nor the X4 has a touch panel, so
+            none of it does anything on your reader today. It is here, complete and kept in step with upstream, so that
+            a reader with a touch screen works the day it arrives rather than months later.</li>
+          <li><strong>A folder with thousands of images no longer crashes the reader.</strong> Opening one built a list
+            holding every filename in memory at once, ran the reader out of memory, and killed it outright — a sleep
+            folder full of wallpapers was enough. Names are now held packed together in one block with a hard ceiling
+            on the whole thing, so a folder too large to list in full shows what fits and says "partial" in its title
+            instead of taking the reader down. The image viewer built its list the same way and would have crashed one
+            step later; it was fixed too.</li>
+          <li><strong>Confirming something no longer carries the button press into the book.</strong> A confirmation
+            acts the moment you press, so the button is often still down when it closes. The reader took over
+            mid-press, read it as a long hold it never saw begin, and ran whatever your long-press button is set to —
+            which, on the sync setting, quietly switched on Wi-Fi and started syncing after deleting a wallpaper. A
+            press now only acts where it started.</li>
+          <li><strong>Banners no longer leave a mark on the page.</strong> The repaint that removed one was the quick
+            kind, which cannot clear what the banner left behind, so its outline stayed faintly on the page. Removing a
+            banner now does the thorough repaint that clears it. Refresh Frequency set to Never still wins.</li>
+        </ul>
+        <strong>Also in 0.8.3:</strong>
+        <ul>
+          <li><strong>The numbers are drawn in a different font.</strong> They used the menu font, which is a pixel font being drawn at 1.6 times its own grid — every stroke landed between pixels and smeared, until 8, 9 and 0 filled in and looked alike. On a real page 128 could read as 12B. They now use Spleen, drawn on its own grid exactly, so each stroke is one clean pixel.</li>
+          <li><strong>A Number Size control, Small or Double.</strong> Small is the font's own size; Double is that same size with every pixel doubled, so the shapes are identical and simply larger. There is nothing offered in between because a pixel font has nothing to draw there: half a pixel rounds unevenly and the smearing comes back.</li>
+          <li><strong>Double is the default, and your books adopt it.</strong> Set it in Settings &rarr; Reader &rarr; Number Size for newly opened books, or per book in the in-book menu under Paragraph Numbers. Books you have already opened take Double on this update; everything else you chose for them is left alone.</li>
+          <li><strong>The numbers sit on the line now, not above it.</strong> They were being centred against the text's line box rather than the text itself, which left them riding high — and by a different amount at each reading size. They are now centred on the letters themselves, measured from the shapes in the font, so they stay put whether you read at 12pt or 18pt.</li>
+        </ul>
+        <strong>Also in 0.8.2:</strong>
+        <ul>
+          <li><strong>One paragraph spacing control instead of two.</strong> Extra Paragraph Spacing and a separate Paragraph Spacing percentage both added a gap, so they fought over the same result. The percentage is gone. Extra Paragraph Spacing is now the whole control: on gives half a line of air between paragraphs, off gives none.</li>
+          <li><strong>Every paragraph starts indented.</strong> The first line of a paragraph always steps in, whether the spacing is on or off, and whatever the book's own styling says. A paragraph at the top of a page has no gap above it to read, so the indent is the cue that has to be there.</li>
+          <li><strong>First Line Indent still yours to set.</strong> It can widen that indent as much as you like, per book or globally. It just cannot take it away.</li>
+          <li><strong>Extra Paragraph Spacing is switched back on once.</strong> Your reader and every book you have already opened adopt the new pair of settings on this update. Everything else you chose is left alone. Each book re-lays out once on its first open, and you land back on the paragraph you were reading.</li>
+        </ul>
+        <strong>Also in 0.8.1:</strong>
+        <ul>
+          <li><strong>Changing a setting no longer loses your page.</strong> A page number is a product of the layout, so a new font, indent, paragraph spacing or rotation used to leave you on a page that no longer meant anything. The reader now remembers the <em>paragraph</em> you were on and finds it again afterwards. A paragraph belongs to the book; a page number belongs to the font.</li>
+          <li><strong>It lands you at the paragraph's start.</strong> If a paragraph runs onto your page from the one before, you land at its beginning, so slightly earlier than you were and never later. Re-reading a line costs nothing; skipping one is a spoiler.</li>
+          <li><strong>New reading look, applied everywhere.</strong> First line of each paragraph indented 20%, half a line of air between paragraphs, and paragraph numbers counting per chapter. Your reader and every book you have already opened adopt these once.</li>
+          <li><strong>Nothing you set yourself is lost.</strong> Books with their own settings keep every other choice; only those three values are re-seeded. A book you have already read re-lays out once on its first open, and you land back on the paragraph you were reading.</li>
+        </ul>
+        <strong>Also in 0.8.0:</strong>
+        <ul>
+          <li><strong>Delete Book, from inside the book.</strong> It sits in the in-book menu under This Book, below Remove from Recents. Remove only unfiles a book; Delete erases the file itself, together with its cache and its place in the recent list. It asks first, and it cannot be undone.</li>
+          <li><strong>Plain text files have a menu now.</strong> They had none at all. Press the confirm button while reading a .txt and a small panel opens with Font, Size and Delete Book.</li>
+          <li><strong>Text files open at the smallest size.</strong> A .txt is usually a dump rather than a typeset book, so it reads best packed small. Its font and size are kept apart from the reader font your EPUBs use, so changing one never moves the other.</li>
+          <li><strong>Changing a text file's font keeps your place.</strong> The page count changes with the font, so the reader lands on the page holding the words you were on, not on the same page number. Each text file re-reads its layout once after this update, which shows the Indexing screen briefly.</li>
+          <li><strong>Your EPUBs are untouched.</strong> Books, places and settings all carry over; nothing re-reads its layout.</li>
+        </ul>
+        <strong>Also in 0.7.4:</strong>
+        <ul>
+          <li><strong>A font size set inside a book is saved at once.</strong> It used to be recorded against the book only when you left the Reader Settings screen, so switching the reader off while still on that screen lost it. Every row of that screen now writes to the book as you change it.</li>
+          <li><strong>Paragraph numbers and Paperback Look survive a font change.</strong> Those are set from the in-book menu, and changing a book's font could previously drag your global values onto the book instead of keeping its own.</li>
+        </ul>
+        <strong>Also in 0.5.1:</strong>
+        <ul>
+          <li><strong>Text Settings opens on the tab bar again.</strong> Since 0.5.0 the screen opened with a font already highlighted, so reaching the Layout or Style tab meant scrolling back up past the font list every time.</li>
+        </ul>
+        <strong>Also in 0.5.0:</strong> twelve changes merged from CrossPoint upstream, each checked against this firmware's own source before being applied. Your books re-read their details once on first open after updating from 0.4.0 or earlier, which makes that one open slower; reading positions and per-book settings are kept.
+        <ul>
+          <li><strong>Font size is now a real point size.</strong> Settings &rarr; Reader &rarr; Font Size offered Small, Medium, Large and X Large. It now lists the actual sizes — 12 pt, 14 pt, 16 pt, 18 pt — and a font family installed on the SD card offers exactly the sizes you installed for it instead of four fixed slots. Your existing choice carries over: Small becomes 12 pt, Medium 14 pt, Large 16 pt, X Large 18 pt — in the global settings, in every book you had customised, and in every saved Reading Theme.</li>
+          <li><strong>Changing font family no longer leaves you on a size that does not exist.</strong> Move to a family that does not ship your current size and it snaps to the nearest size that family does ship.</li>
+          <li><strong>Books open at the right place again.</strong> Some EPUBs name their starting point so vaguely that it could send you to the wrong chapter.</li>
+          <li><strong>Dictionary lookups say what actually went wrong.</strong> Every failure read "Not found", whether the word was genuinely missing, memory ran out, or the dictionary file could not be decompressed.</li>
+          <li><strong>Custom fonts keep their ligatures.</strong> The font converter was discarding the joined letter pairs (fi, fl and the like) that a font ships.</li>
+          <li><strong>Book sync over Wi-Fi needs less free memory.</strong> The secure-connection floor dropped to 35 KB, so sync now succeeds where it used to give up.</li>
+          <li><strong>Translation and message fixes.</strong> Corrections to several languages, and the image viewer's error messages are translated instead of always appearing in English.</li>
+        </ul>
+        <strong>Also in 0.4.0:</strong>
+        <ul>
+          <li><strong>Books with a long comment attached no longer refuse to open.</strong> A ZIP file keeps its index near the end, and we only looked in the last kilobyte for it, so any EPUB carrying a longer trailing comment simply would not open.</li>
+          <li><strong>Books with a thin chapter list get a real one.</strong> Some converted books carry a short modern contents list alongside a complete old-style one; we always trusted the modern one. Whichever lists more chapters now wins.</li>
+          <li><strong>Long footnote links work again.</strong> Footnote addresses were capped at 96 characters and Calibre routinely makes them about 150, so those footnotes could not be followed.</li>
+          <li><strong>The home Back button is yours to set.</strong> It used to open your last book with no warning and no way to stop it. Under Settings &rarr; Controls it is now None, Resume, or Recent Books, and the on-screen hint follows what you chose. Resume stays the default, so nothing changes unless you change it.</li>
+          <li><strong>About 1.5 KB of memory handed back.</strong> Two parts of the text-direction code each kept an identical scratch pad; they now share one. Measured on the build, not estimated.</li>
+          <li><strong>The XML reader stops keeping notes nobody reads.</strong> It retained a kilobyte of parse history per parser for a lookup this firmware never performs.</li>
+        </ul>
+        <strong>Also in 0.3.1:</strong>
+        <ul>
+          <li><strong>Chapter titles are no longer numbered as paragraph 1.</strong> With Paragraph Numbers on, the little 1 landed on the chapter title and the first real paragraph got 2. Version 0.3.0 claimed to fix this and did not: the fix was written but could never run.</li>
+        </ul>
+        <strong>Also in 0.3.0:</strong>
+        <ul>
+          <li><strong>One text size across the whole interface.</strong> The battery percentage was drawn smaller than the version and page count beside it, and screen titles, tabs and pop-up headings were drawn larger. Everything now matches the home screen.</li>
+          <li><strong>The top banner is thinner.</strong> The black band that appears when the device wakes, and every message pop-up, lost eight pixels of padding.</li>
+          <li><strong>The home screen no longer has a hole in it.</strong> The "N more above" and "N more below" chips were pinned to the top and bottom of the list area while the books floated in the middle. Chips and books are now centred together as one block.</li>
+          <li><strong>Session Pages is now in Customise Status Bar.</strong> The setting always worked and the web settings page always had it; the on-device screen was simply missing the row.</li>
+          <li><strong>Paragraph Numbers, Paperback Look and Paperback Status are now in Settings &rarr; Reader.</strong> They set what a newly opened book starts with. Books you have already customised keep their own settings, and the in-book menu still overrides any of them per book.</li>
+          <li><strong>Wrapped book titles line up.</strong> A title too long for one line used to drop back to the far left, under the percentage chip. Every line now starts under the first line.</li>
+          <li><strong>Sleep-screen ghosting.</strong> The cause was found by comparing against the older Lector, which never ghosted: it limits how many quick screen updates can run in a row before forcing a clean one. That limit was lost in the rebuild and is now back. It costs one flash roughly every thirteen page turns.</li>
+          <li><strong>The in-book menu is grouped.</strong> Its rows now sit under Navigate, This Book, Look, Sleep Screen and Device headings instead of one long undivided list.</li>
+        </ul>
+        </details>
+      </div>
+
+      <!-- Hide this panel again (add the hidden attribute back) whenever the channel is empty. The
+           button, its handler and its manifest all stay wired up either way, so putting a build
+           back on this channel is a matter of removing the hidden attribute and publishing the
+           payload. -->
+      <div class="rescue" id="experimentalPanel" hidden>
+        <h3>Experimental build</h3>
+        <p><strong>This build measures how long waking up takes.</strong> The bottom banner on the unlock screen
+          shows numbers instead of your footer. That is on purpose, and only in this build. It is the timing of the
+          <em>previous</em> wake, because the last number cannot be known until the book is already on screen.</p>
+        <p>It also carries the newer display SDK, already tested on both readers, and drops a half-second pause that
+          used to hold the unlock banners on screen for no reason.</p>
+        <div class="warn"><strong>When a build is here, it is experimental.</strong> Flash it only if you can plug the
+          reader in and re-flash it. Your books on the SD card are never touched.
+          <br><br>To go back, press <strong>Update my reader</strong> above — that reinstalls the stable build.</div>
+        <div class="verline">Experimental build on this site</div>
+        <div class="verval"><span id="flashExperimentalVersion">…</span></div>
+        <div class="actions">
+          <button class="btn btn-ghost" id="btnExperimental" type="button">Flash the experimental build</button>
+        </div>
+        <p id="flashExperimentalMissing" class="fallback" hidden>The experimental build is not published right now.
+          The Update button above works.</p>
+      </div>
+
+      <div class="rescue">
+        <h3>Install on a new device — or full rescue</h3>
+        <p>Use this if your reader <strong>does not have Lector yet</strong> (fresh from the shop, still on the
+           stock firmware), or if a device is dead, blank, or bricked. It writes the bootloader, partition table,
+           and app from scratch — everything a reader needs to run Lector.</p>
+        <div class="warn"><strong>Warning:</strong> a full flash <strong>erases everything</strong> on the device.
+          On a brand-new reader there is nothing of yours to lose. On a reader you have used, its books and settings
+          stored in flash are erased. Book files on the SD card are not touched.</div>
+        <div class="actions">
+          <button class="btn btn-ghost" id="btnRescue" type="button">Full install / rescue flash (erases device)</button>
+        </div>
+        <p id="flashRescueMissing" class="fallback" hidden>Install files are not published yet — they land with the
+          next Lector release. The Update button above works now.</p>
+      </div>
+
+      <div class="fprog" id="flashProgressWrap" hidden>
+        <div class="fbar"><div class="fbar-fill" id="flashBar"></div></div>
+        <div class="fstatus mono" id="flashStatus"></div>
+        <pre class="flog mono" id="flashLog" aria-live="polite"></pre>
+      </div>
+      <p class="fallback" id="flashUnsupported" hidden>This browser cannot flash — open the site in
+        <strong>Chrome</strong> or <strong>Edge</strong> on a desktop (Web Serial is required).</p>
+    </div>
+
+    <div class="panel">
+      <ol class="steps">
+        <li>Use <strong>Chrome</strong> or <strong>Edge</strong> on a computer — you are already here (Web Serial only).</li>
+        <li>Plug the reader into a USB port with a <strong>data</strong> cable.</li>
+        <li>Click <strong>Update my reader</strong> (already running Lector) or <strong>Full install / rescue
+          flash</strong> (a new or dead device), and pick the reader's serial port when asked.</li>
+        <li>Wait for the flash to finish, then reboot the reader by hand: press <strong>Reset</strong>, then
+          <strong>Power</strong>. The X3 / X4 do not auto-reboot over USB.</li>
+      </ol>
+      <div class="note">Nothing is uploaded to a server. The firmware is served from this site and written to the
+        device entirely inside your browser via <strong>esptool-js</strong> (the same engine the official ESP
+        tools use).</div>
+    </div>
+
+    <details>
+      <summary>How this works</summary>
+      <p>Your Lector reader runs on an <strong>ESP32-C3</strong> chip. This talks to the chip over the USB serial
+        port using the browser's Web Serial API.</p>
+      <ul>
+        <li><strong>Update</strong> writes <code>boot_app0.bin</code> (OTA data, <code>0xe000</code>) and
+          <code>firmware.bin</code> (app, <code>0x10000</code>) <strong>without erasing</strong> — so NVS
+          settings and the book storage survive. This is the normal, data-preserving update.</li>
+        <li><strong>Full install / rescue</strong> erases the chip, then writes the bootloader (<code>0x0</code>),
+          partition table (<code>0x8000</code>), OTA data (<code>0xe000</code>), and app (<code>0x10000</code>). This
+          is what a device without Lector needs — a stock reader has a different partition table, so an app-only
+          Update would not boot.</li>
+        <li>One firmware serves <strong>both X3 and X4</strong>; the running code detects the model at boot.</li>
+      </ul>
+    </details>
+
+    <div class="panel whatsnew">
+      <h3>Release history</h3>
+      <p class="relnote-lead">Every earlier release, newest first. Open one to read what changed.</p>
+      <details class="relnote">
+        <summary>lector.c 0.7.4</summary>
+      <p>One fix. A book now keeps the text settings you give it the moment you give them, instead of at the moment you leave the screen.</p>
+      <ul>
+        <li><strong>What was wrong.</strong> Open a book, open its Reader Settings, change the font size. The page changed at once, so the change looked done. It was not recorded against the book until you pressed Back to leave that screen. Switch the reader off while still on the screen and the book forgot it. Your global default kept the new size; the book you were actually reading went back to what it had.</li>
+        <li><strong>What changed.</strong> Every row of that screen — font, size, line spacing, paragraph spacing, alignment, margins, indent, hyphenation, the lot — is written against the book at the instant you change it. The screen already saved your global settings on every row; it simply never told the book.</li>
+        <li><strong>Your paragraph numbers and Paperback Look are safe.</strong> Those three are set from the in-book menu, not from that screen, and the settings screen reports the global values for them. Changing a book's font used to be able to drag the global values onto the book. It takes the book's own now.</li>
+        <li><strong>Changing your mind costs nothing.</strong> Change a row and change it straight back, and a book that was following your global settings goes on following them. It does not quietly become a book with settings of its own.</li>
+      </ul>
+      <p>Nothing re-reads its layout after this update. Your books, your places in them, and their settings are untouched. Tested on an X4.</p>
+      </details>
+      <details class="relnote">
+        <summary>lector.c 0.7.3</summary>
+      <p>Two fixes from upstream, both of which had to be applied by hand because this firmware had already changed the same code.</p>
+      <ul>
+        <li><strong>Spaces between Korean words are back.</strong> The layout engine is allowed to break a line between almost any two Chinese or Japanese characters, and it was treating that permission as a sign the two words were joined, so it closed the gap between them. That is correct for Chinese and Japanese, which are written without spaces, and wrong for Korean, which is not. A gap is now only closed when the book's own markup genuinely runs the two words together.</li>
+        <li><strong>An image page after a sync is clean.</strong> Pages with an image on them skip the normal screen-refresh cycle and paint in two quick passes instead. Coming back from a KOReader sync the reader restarts quietly, and those two quick passes then ran over whatever the screen was still holding, leaving the old view mixed into the picture. Image pages now clear to a proper base first.</li>
+      </ul>
+      <p><strong>Every book re-reads its layout once</strong> after this update, so the first time you open each book it is slower than usual. Your place in every book, and any settings you set per book, are kept.</p>
+      </details>
+      <details class="relnote">
+        <summary>lector.c 0.7.2</summary>
+      <p>The hardware kit this firmware sits on had been left fourteen versions behind since 0.7.0, held there by a single disagreement about one pin. That is now settled and the kit is current.</p>
+      <ul>
+        <li><strong>The disagreement, and why it mattered.</strong> Pin GPIO13 is the battery latch on an X4 — hold it high and the reader stays alive, drop it and it switches off. The kit says that on an X3 the same pin switches the SD card's power instead. Both cannot be true, and being wrong meant either a reader that would not switch off or a card that lost power at the wrong moment. It was settled by building a firmware that simply stopped touching the pin on an X3 and trying it: the reader still switched off, so the pin is not the off switch there. The kit was right.</li>
+        <li><strong>But the kit cannot own that pin by itself.</strong> Two builds proved it, both by drawing the sleep picture half-finished or almost blank. That pin is a flash pad, and the chip pulls unused flash pads low every time the reader dozes. Only a deliberate hold survives that, and only this firmware knows to apply one — the kit has no reason to suspect the pin is special. The sleep picture is read from the SD card, so the card losing power mid-doze is exactly what a half-drawn picture looks like. The hold now stays on both readers, under both meanings.</li>
+        <li><strong>What the kit brings.</strong> A ghosting fix and partial-refresh support for the UC8179 panel, revised greyscale waveforms for it, an on-demand memory reclaim, and display-controller detection that probes the panel over its own bus rather than trusting a factory value in flash — that value can be overwritten by a full flash from another unit, and then names the wrong screen.</li>
+        <li><strong>Tested on both readers</strong> before release: sleep picture, switching off from the menu and by holding the power button on battery, reading from the card, waking, and a book with images in it.</li>
+      </ul>
+      </details>
+      <details class="relnote">
+        <summary>lector.c 0.7.1</summary>
+      <p>The home screen had a Recent Books button sitting between Browse Files and OPDS Browser. It opened a list of the books you have in progress — which is what the home screen was already showing above it, with the same titles, the same authors and the same percentages. It is gone, and the space it was using now belongs to the list that was doing its job.</p>
+      <ul>
+        <li><strong>The book list fills the screen.</strong> It was drawn into a fixed-height tile with the menu pinned below it, so a shorter menu simply left a blank band. The menu is now anchored to the bottom, the list runs from the header down to it, and the list will draw as many books as fit — up to the thirteen the reader remembers, rather than the eight it was silently capped at.</li>
+        <li><strong>The Back button on the home screen.</strong> It could be set to open Recent Books. That option is gone with the screen. If you had it set that way, Back now resumes your last book instead. Nothing else you have set changes.</li>
+        <li><strong>Settings &rarr; Display &rarr; Author On Home.</strong> Titles are followed by the author's initials — "by GW". Set this to Full Name and you get "by Gene Wolfe". Initials stays the default.</li>
+        <li><strong>A dictionary lookup no longer runs out of memory.</strong> Compressed dictionaries (the <code>.dict.dz</code> kind) had their whole definition block read into memory at once. Index files are also opened once per lookup now instead of repeatedly, which makes every lookup quicker.</li>
+        <li><strong>Text settings save the moment you change them.</strong> They were written when you left the screen, so a reader that ran out of battery on that screen lost the change. One gap remains, and it is worth knowing: a font or size changed from <em>inside a book</em> belongs to that book alone, and is still only written when you close the settings screen normally. Changed from the Settings menu, it saves immediately.</li>
+        <li><strong>Book text no longer needs one unbroken block of memory.</strong> It was held in a structure that must sit in a single run; on a reader whose memory has been chopped into small pieces by a long session, a large chapter could fail to find one. It now uses many small blocks instead.</li>
+        <li><strong>Smaller things.</strong> The language list is ordered by each language's own name rather than by its internal code, so it reads in a sensible order. The update screen printed "Cancel" and "Update" twice — once as touch targets, which no Xteink has.</li>
+      </ul>
+      </details>
+      <details class="relnote">
+        <summary>lector.c 0.7.0</summary>
+      <p>The reader used to stay fully awake between your button presses, spinning through a loop that did nothing but ask "has a button been pressed yet?" thousands of times a second. It now sleeps in that gap and wakes on the press. The change comes from upstream CrossPoint, where its author measured it on an X3 with a power meter: about <strong>three times longer active reading</strong>, an idle draw of roughly 2.93 mA on a page, and about 30.24 mC per page turn.</p>
+      <p>This build spent three days in the experimental channel and did not survive the first one intact. What follows is the whole of it, including the part that went wrong.</p>
+      <ul>
+        <li><strong>The first attempt dropped roughly one press in three.</strong> Sleeping between presses is safe. This also slept <em>during</em> a screen refresh, in 20 ms slices — and the front and side buttons are not simple on/off pins the chip can wake on. They are resistor-ladder inputs on a single analogue pin, which can only be read by asking. A tap that began and ended inside one sleeping slice was never asked about, so it never happened. Every screen update is a refresh, so menus dropped presses exactly like books did.</li>
+        <li><strong>It was reported upstream with the mechanism, and fixed there.</strong> Three builds were flashed to an X4 to isolate it — the full change, the change with in-refresh sleeping removed, and the stable build as a control — and the result went to the change's author as a comparison table. He reproduced it, disagreed with the first guess at the cause, found two deeper reasons, and fixed both. Sleeping halts the operating system's clock without telling it, so a pause written as "wait 10 ms" was really lasting about 210 ms; and the reader was handed back too little time to finish even one pass of its own loop between slices. Both are corrected upstream, and he reports no measurable energy cost for the correction.</li>
+        <li><strong>Tested on both readers before it came here.</strong> Eight rapid taps give eight page turns in a book and eight moves in a menu, on an X4 and on an X3. Powering off from the menu and by holding the power button both work on battery with nothing plugged in — that last one matters more than it sounds, because sleeping holds a pin high that the battery latch also uses, and getting it wrong means a reader that will not switch off.</li>
+        <li><strong>Tilt page turn is gone.</strong> The X3 has a motion sensor and could turn pages by tilting; the X4 has none, so the setting was invisible there. It went unused, and its driver, its setting, and its text in all 31 languages are removed. Your other settings are untouched.</li>
+        <li><strong>Five more fixes merged from upstream.</strong> Wi-Fi file transfer picks its second port from the first rather than assuming one; ruby text (the small pronunciation glosses above Japanese and Chinese characters) stops reserving memory for glosses that are not there; the reading-position extension is offered only to the official sync server instead of to every server; the motion sensor is powered down properly on readers that have one; and the unbricking instructions are written down.</li>
+        <li><strong>The hardware kit underneath moved up.</strong> Detecting whether a reader is an X3 or an X4 was done here with a hand-written probe; that job now belongs to the shared kit upstream, and 134 lines of ours came out. This is why the X3 was tested separately before release rather than trusted to be fine.</li>
+      </ul>
+      </details>
+      <details class="relnote">
+        <summary>lector.c 0.6.1</summary>
+      <p>0.6.0's tabbed menu went onto a device and came back with two faults, both of which were mine. The five tab labels measured 531 pixels against the 460 the bar has, so "Device" was painted past the right edge and shown as "De"; and holding Up or Down walked into the tab's rows rather than moving between tabs, which is the natural thing to try when a bar of tabs is in front of you.</p>
+      <ul>
+        <li><strong>Shorter labels, and a bar that cannot overrun.</strong> "This Book" is now "Book" and "Sleep Screen" is now "Sleep" — neither word was doing any work, and the set drops to 392 pixels. Independently of that, the tab bar now measures itself before drawing: it never paints past its right edge, and if the labels ever do outgrow the bar it scrolls so that the selected tab is the one guaranteed to be readable. That second part is a guard rather than a fix — measured across all 31 translations and both built-in interface fonts, nothing overflows today.</li>
+        <li><strong>Holding Up or Down switches tab.</strong> A tap moves one step along the ring as before. This is the same split Text Settings and Settings use, so it is not a new gesture, and it is why row movement here now happens on release rather than on press: that is what lets a tap and a hold mean two different things without the hold also stepping the cursor when you let go.</li>
+        <li><strong>Arriving at a tab by holding leaves you on the tab bar.</strong> Tabs still remember their own row, but a switch made from the tab bar lands on the tab bar. Without this the bar stopped drawing as focused half way through a hold, the Confirm hint reverted from the next tab's name to "Select", and a Confirm meant as "next tab" would have fired whatever row the new tab was parked on — in the Sleep tab, that can be Delete Wallpaper. The confirmation screen would still have caught it, but the row is placed last precisely so a stray press cannot reach it.</li>
+        <li><strong>Two code reviews, and what they found.</strong> Both were run against the first fix before it shipped. The cursor-parking fault above is theirs. So is a correction to three comments I had written into the code: one of them justified a layout decision with measurements taken through a settings key that does not exist, which had sized the name of the key rather than the text. Remeasured properly, the widest tab bar in any language is Portuguese (PT) Text Settings at 446 pixels. The decision was right; the reason given for it was not. Both reviews also found ways the shared button-hold timer can misbehave in sequences involving two buttons at once. Those are older than this change, shared by every screen, and the obvious one-line fix breaks the volume-style sliders, so they are written down rather than patched in next to a UI change.</li>
+      </ul>
+      </details>
+      <details class="relnote">
+        <summary>lector.c 0.6.0</summary>
+      <p>The in-book menu had grown to about twenty-eight rows in a single list, with five headings printed inside it to mark where one group ended and the next began. Those headings were rows: they took a slot, they could not be selected, and the Up/Down handler had to step over them. The groups are now tabs, and each tab draws only its own rows. This is a rearrangement, not a cull — every option is still present, in the group it was already in.</p>
+      <ul>
+        <li><strong>Five tabs, and one of them comes and goes.</strong> Navigate, This Book, Look, Sleep Screen and Device. The Sleep Screen group was always conditional — it acts on the wallpaper the lock screen last showed, so it is meaningless when the last sleep screen was not a wallpaper, or when that file has since left the card. As a tab it is simply not built in that case, so there is never an empty tab to land on, and the bar shows four.</li>
+        <li><strong>Navigation reuses the Text Settings idiom.</strong> The tab bar is position 0 of the Up/Down ring, so walking off either end of a tab's rows lands on it. Switching tab is Confirm while the tab bar is selected, which wraps. It is not a direction press, and that is a hardware constraint rather than a preference: on this device Left and Right are the same logical axis as Down and Up (<code>NavNext</code> is Down or Right, <code>NavPrevious</code> is Up or Left), so there is no spare direction to spend. Text Settings switches tabs on Confirm from its tab bar too, so the gesture is not a new one to learn.</li>
+        <li><strong>Each tab keeps its own cursor.</strong> Leave a tab part-way down its list, visit another, come back, and the selection is where you left it rather than reset to the top.</li>
+        <li><strong>The menu opens on the tab it should.</strong> Focus starts on the tab bar, and the active tab is Sleep Screen whenever a wallpaper is in play — this menu is normally reached by waking the device, and the wallpaper rows are the only ones here about that moment rather than about the book. Otherwise it opens on Navigate. Delete Wallpaper stays last in its tab and is never the row selected on arrival.</li>
+        <li><strong>Row movement is unchanged.</strong> It stays on press-plus-hold-repeat, like every other list in the firmware. Text Settings moves on release because it spends the hold gesture on tab switching; this menu does not, and its press/release behaviour was left exactly as it was rather than quietly re-tuned.</li>
+      </ul>
+      </details>
+      <details class="relnote">
+        <summary>lector.c 0.5.1</summary>
+      <ul>
+        <li><strong>The Text Settings screen opens with the tab bar focused, not a font.</strong> 0.5.0 made the Family and Size tabs open on whatever is currently selected, which is right — but the same code also ran for the tab you actually opened the screen on, so a font row came up highlighted and any trip to Layout or Style started by scrolling back out of the list. Reported against upstream's release candidate and fixed in one line; taken here because 0.5.0 shipped the change that caused it.</li>
+      </ul>
+      </details>
+      <details class="relnote">
+        <summary>lector.c 0.5.0</summary>
+      <p>This release is a merge rather than a hand-picked set: twelve commits that had already landed on CrossPoint's development branch were taken in one go. Eleven files collided, and every one of them collided over the same upstream change — the reader's font size stopped being an abstract Small/Medium/Large/X&nbsp;Large slot and became a real point size. Half of that change touched files this fork had barely modified and merged itself automatically, so declining the other half was never actually an option; the choice was between adopting it properly and leaving the firmware in two minds about what a font size is. It was adopted properly. The rule used to settle every collision is the one this fork has used since its first upstream merge: our feature stays, their mechanism is folded around it. The light-sleep work that would roughly triple reading time per charge is still open upstream, still unreviewed, and still not taken here for the same reason as last time — it changes when the device is awake and listening, and that can only be proven on real hardware over several days.</p>
+      <ul>
+        <li><strong>Font size is a point size now, and your existing setting survives it.</strong> The reader stored a number from 0 to 3 meaning Small, Medium, Large or X&nbsp;Large, and mapped it to a font at render time. That mapping had broken more than once, and it forced every font family — including one you installed yourself at whatever sizes you chose — into exactly four slots. The setting now holds the point size itself, the menu lists what the active family actually ships, and switching to a family without your current size snaps to the nearest size it does have. The migration is the delicate part, and it is deliberate: no font is renderable at 0, 1, 2 or 3, so that range is unambiguously an old value and is folded up to 12, 14, 16 and 18 wherever it appears. That includes two stores upstream does not have and therefore did not migrate — the per-book override each customised book keeps beside it, and every saved Reading Theme. The per-book file's version was raised, but the old version is deliberately still accepted and converted rather than rejected: rejecting it is the normal way this fork retires an old format, and here it would have silently discarded every per-book setting the first time the device booted. Two tests were added that fail if that ever regresses.</li>
+        <li><strong>A book reading at its own font settings can no longer overwrite your global ones.</strong> Upstream's version of the font loader persists a size correction whenever the loaded font differs from the setting, which is right when the global selection is what is being loaded. This fork also loads fonts on behalf of a single customised book, and on that path the same code would have written that book's size back into your global settings. Every write to the global settings is now behind the flag that distinguishes the two paths.</li>
+        <li><strong>Books open where they should.</strong> An EPUB may name a starting location, and some name it so ambiguously that the reader resolved it to the wrong chapter. Ambiguous references are now ignored in favour of the ordinary starting point. The stored book details change shape for this, so every book re-reads them once on first open; reading positions are not affected.</li>
+        <li><strong>A failed dictionary lookup tells you which failure it was.</strong> Missing word, out of memory, and a file that could not be decompressed all reported "Not found", which made a broken dictionary file indistinguishable from a word that simply is not in it.</li>
+        <li><strong>Custom fonts keep their ligatures.</strong> The converter that turns a desktop font into one this device can use was discarding the joined letter pairs — fi, fl and their relatives — that the source font ships.</li>
+        <li><strong>Reading-position sync needs 5&nbsp;KB less free memory.</strong> The floor the secure connection insists on before it will start dropped to 35&nbsp;KB, which is the difference between syncing and giving up on a device that has a book open.</li>
+        <li><strong>Interface text fixes.</strong> Corrections across several translations, and the image viewer's error messages now go through the translation system instead of always appearing in English.</li>
+        <li><strong>One upstream fix was examined and deliberately not taken.</strong> A change that binds each settings label to its stored value fixes, among other things, a status-bar clock whose labels were listed in a different order than the values behind them. That fault cannot occur in this firmware: the status bar here was rebuilt around per-item positions and has no such setting. The half that does apply — binding the sleep-screen labels — was taken, and this fork's two extra sleep screens were bound along with it.</li>
+      </ul>
+      </details>
+      <details class="relnote">
+        <summary>lector.c 0.4.0</summary>
+      <p>Upstream CrossPoint has around sixty open pull requests and no approvals among them, so every candidate here was read against this firmware's own source rather than trusted from its description. Six were small enough to verify end to end, and all six are genuinely absent from this build; the larger ones were deliberately left alone. The one being watched but not taken is upstream's light-sleep work, which claims roughly three times the reading time per charge: this fork is unusually not blocked on it, because the display driver hook it depends on already sits in our vendored SDK while upstream still waits. It was skipped because it changes exactly when the device is awake and listening, which is the behaviour this firmware has already spent several releases getting right, and it cannot be proven anywhere but on a real device over several days.</p>
+      <ul>
+        <li><strong>An EPUB with a trailing comment no longer fails to open.</strong> A ZIP archive stores its directory at the end, preceded by an optional comment of up to 65,535 bytes, so the record can sit as far as 65,557 bytes from the end of the file. The scan looked only at the final kilobyte, so any book packed with a longer comment was rejected outright. The scan now walks backwards from the end in four-kilobyte windows, each overlapping the last by twenty-one bytes so a record straddling a boundary is never missed, and stops at the first match — which, searched in that order, is guaranteed to be the real record rather than a stray signature inside the comment. Two other faults went with it: the old code read a four-byte value through a pointer cast that is undefined behaviour on this processor when the address is not aligned, and it allocated its buffer by hand with an error path that leaked.</li>
+        <li><strong>A sparse chapter list now loses to a complete one.</strong> Books converted by Amazon and Calibre often ship a modern navigation document listing only parts and front matter next to an older-style index carrying every chapter. The reader took the modern one whenever it parsed at all, so those books opened with a nearly empty contents screen. A navigation document covering less than half the book's sections is now treated as suspect, the older index is given a chance, and whichever lists more chapters is kept — with the first one re-read if the second turns out no better. The entry counter is reset when a pass restarts, so a rerun cannot add its total on top of the discarded one.</li>
+        <li><strong>Footnote links longer than 96 characters are no longer truncated.</strong> Calibre generates targets of the shape <code>Author-Title_split_042.html#_ftn7</code>, which after URL encoding runs to about 150 characters, so the address was cut and the footnote could not be followed. This is the second time the limit has been raised for the same reason. It is not free: this record is written into every page stored on the card, so the page cache format changes and every book re-indexes once, and each footnote actually present on a loaded page costs 160 bytes more than before, capped at sixteen per page. The upstream number was kept rather than a tighter one of our own, because diverging here would guarantee a conflict the next time upstream is merged.</li>
+        <li><strong>The home screen's Back button is configurable.</strong> Back had no navigation target on the home screen, so it was quietly wired to open the most recently read book — useful once you knew, startling until then, and impossible to turn off. It now reads a Home Back Button setting under Controls with three choices: None, Resume, and Recent Books. The button hint at the bottom of the screen follows the setting instead of being hardcoded, and None draws no hint box at all rather than an empty one. Resume remains the default so no existing behaviour changes on update.</li>
+        <li><strong>Roughly 1.5 KB of permanently resident memory recovered.</strong> The bidirectional text code, which handles right-to-left scripts, has two entry points that each kept their own private reordering buffer sized to the maximum line length. Neither calls the other and a mutex already prevents them running at once, so one buffer serves both. The saving is measured rather than claimed: static RAM on the build fell from 52,460 to 50,940 bytes.</li>
+        <li><strong>The XML parser stops retaining parse context.</strong> Expat can hold a rolling window of recently consumed input so that an application may ask what surrounded an error. This firmware never asks — nothing in it calls that function, which was verified before the change — so the window was a kilobyte of heap per live parser bought for nothing.</li>
+      </ul>
+      </details>
+      <details class="relnote">
+        <summary>lector.c 0.3.1</summary>
+      <ul>
+        <li><strong>Chapter titles stop taking paragraph number 1.</strong> Version 0.3.0 announced this fix. The fix was written, shipped, and could never once have run &mdash; which is worth stating plainly, because it was announced as done. Turning Paragraph Numbers on still put the 1 on the chapter title and started the real text at 2. The cause was an ordering mistake rather than a missing rule. A block of text is not laid out when it is read; it is laid out later, at the moment the next element opens, because only then is it known to be finished. The mark saying "this block is a heading" was kept on the parser, and the same routine that opens the next element clears that mark before flushing the previous block &mdash; so the mark describing the heading was reliably already gone at the one instant it was consulted. The mark now lives on the block itself, where it cannot come adrift from what it describes. That also repairs a case which could never have worked before: a two-line chapter title split by a line break is two blocks, and only the first was ever a candidate for skipping, so the second half of such a title took a number of its own. Both halves are skipped now. Because paragraph numbers are stored in the page-layout cache, every book re-indexes once on first open after this update; that one open is slower than usual and reading positions are kept.</li>
+      </ul>
+      </details>
+      <details class="relnote">
+        <summary>lector.c 0.3.0</summary>
+      <ul>
+        <li><strong>The interface is one text size.</strong> Three sizes were in use across the chrome with no rule about which went where. The battery percentage was the smallest of the three, sitting on the home screen's top row beside the version string and the page counter, which were both a step larger &mdash; and every piece of code that reserved space for that percentage had already been measuring it at the larger size, so the layout maths and the drawing disagreed. Screen titles, sub-headers, tab labels, the option chooser's heading and the value slider were a step larger again, which on a pixel font reads as bold. All of it now draws at the size the home screen uses. Two theme flags were removed in the process; one of them chose between bold and bold, and had done nothing since it was written.</li>
+        <li><strong>The battery cluster has one definition.</strong> Its width &mdash; icon, gap, and a full-width "100%" &mdash; was written out separately in four places: the header's own clear rectangle, the home screen's clock placement, and the title reserves on the book info and reader menu screens. They are now one function, so they cannot drift apart again. The clear rectangle in particular was a hardcoded eighty pixels that was too narrow for the percentage in a taller font and began below the text's glyph tops, which could leave fragments of the previous reading behind on a partial redraw. The icon's vertical position is now derived from the font's line box rather than a fixed offset, so it centres correctly in the taller font used for Arabic and Hebrew as well.</li>
+        <li><strong>The top banner is thinner.</strong> Its padding dropped from ten pixels to six, taking the band from forty-five pixels to thirty-seven. One number controls it, and the wake banners and every message pop-up read that number, so they cannot diverge. The progress bar that some pop-ups carry now finds its slot from the band's own geometry instead of a tuned constant, so it will not need re-tuning the next time the band changes.</li>
+        <li><strong>The home screen's list indicators are centred with the books.</strong> The "N more above" and "N more below" chips were each pinned to their end of the list area while the rows were centred in the space between. With a short list that meant a chip pressed against the header, the books floating in the middle, and the reserved-but-unused band at the other end showing as a large empty gap. The chips and the rows are now centred together as a single block, with each chip hugging the rows. How many books fit on screen is unchanged.</li>
+        <li><strong>Session Pages joins the on-device status bar screen.</strong> The count of pages turned this sitting had a setting, was drawn by the status bar, and appeared in the web settings page &mdash; but the row was never added to the device's own Customise Status Bar list, so there was no way to place it without a browser. It is there now, with the same anchor picker as every other item.</li>
+        <li><strong>Paragraph Numbers, Paperback Look and Paperback Status are now global settings.</strong> All three were reachable only from the in-book menu, which meant every new book started from the built-in default no matter what you had chosen for the last twenty. They now live under Settings &rarr; Reader and seed what a freshly opened book starts with. A book that already carries its own settings keeps them, and the in-book menu still overrides any of them for a single book. Paperback Look had a hand-written pair of save and load routines because it was outside the settings list; those are gone now that it is inside it.</li>
+        <li><strong>Wrapped book titles line up with the first line.</strong> A title too long for one line ran its continuation back to the left margin, underneath the percentage chip, so the block had a ragged left edge that changed depending on how long the title was. Every line now starts at the same place as the first line's text.</li>
+        <li><strong>Sleep-screen ghosting: cause found, fix restored.</strong> This was being chased in the wrong place. Locking already drove the whole panel to black and back to white before painting the sleep image, and making that wipe stronger still did not help. Comparing the two source trees settles why: the older Lector, which never ghosted, does a <em>weaker</em> wipe than this one &mdash; a single pass. So the wipe was never the missing piece. What the older Lector also had, and what the rebuild had dropped, is a cap on how many quick differential screen updates may run consecutively: every thirteenth is promoted to a clean pass, regardless of the Refresh Frequency setting. Without that cap an unbounded run of quick updates accumulates, and a page held still for minutes traps charge deep enough that no amount of inverting at lock can undo it &mdash; which is exactly why locking after a cold boot looked clean while locking after a session did not. The cap is back, with the four tests that came with it, and the lock's wipe is back to the single pass the older Lector used. The cost is one flash per thirteen page turns.</li>
+        <li><strong>The in-book menu is divided into sections.</strong> Roughly thirty rows ran in one undivided list whose order had accumulated rather than been decided. They now sit under five headings: Navigate for anything that moves the reading position, This Book for what the book says about itself and what you take out of it, Look for anything that changes how the page is drawn, Sleep Screen for wallpaper triage, and Device for the rest. Headings are drawn with a rule running out to the edge, are never highlighted, and Up/Down steps over them rather than stopping on a dead row.</li>
+      </ul>
+      </details>
+    </div>
+  </section>
+
+  <footer>Made for the <a href="https://github.com/diogo7dias/lector" target="_blank" rel="noopener">Lector</a>
+    / CrossPoint e-reader · single-file, offline-capable.<br>
+    Firmware repository and releases:
+    <a href="https://github.com/diogo7dias/lector" target="_blank" rel="noopener">github.com/diogo7dias/lector</a></footer>
+</div>
+
+<script>
+"use strict";
+// ---------- theme ----------
+const themeToggle=document.getElementById("themeToggle");
+function setTheme(theme, persist=false){
+  document.documentElement.dataset.theme=theme;
+  document.documentElement.style.colorScheme=theme;
+  const next=theme==="dark"?"light":"dark";
+  themeToggle.setAttribute("aria-label",`Switch to ${next} mode`);
+  themeToggle.title=`Switch to ${next} mode`;
+  if(persist){
+    try{localStorage.setItem("lector-theme",theme);}catch(_e){}
+  }
+}
+setTheme(document.documentElement.dataset.theme||"light");
+themeToggle.addEventListener("click",()=>{
+  setTheme(document.documentElement.dataset.theme==="dark"?"light":"dark",true);
+});
+
+const INK = "var(--ink)";
+const LEVELS = [0,85,170,255];
+// ---------- state ----------
+const S = { w:528, h:792, fmt:"pxc", fit:"stretch", mode:"threshold", contrast:1, invert:0, files:[] };
+
+// ---------- brutalist press feedback ----------
+// Nudges an element down-right and shrinks its hard shadow while pressed, so
+// buttons/links feel physically clicked. `base` is the resting box-shadow.
+function press(el, base){
+  base = base || "4px 4px 0 0 "+INK;
+  el.style.transition = "transform .08s cubic-bezier(.32,.72,.12,1),box-shadow .08s";
+  el.style.boxShadow = base;
+  const down = ()=>{ el.style.transform="translate(2px,2px)"; el.style.boxShadow="2px 2px 0 0 "+INK; };
+  const up   = ()=>{ el.style.transform=""; el.style.boxShadow=base; };
+  el.addEventListener("mousedown",down); el.addEventListener("mouseup",up);
+  el.addEventListener("mouseleave",up); el.addEventListener("blur",up);
+}
+
+// ---------- segmented control wiring ----------
+function seg(id, on){
+  const el = document.getElementById(id);
+  el.addEventListener("click", e=>{
+    const b = e.target.closest("button"); if(!b) return;
+    [...el.children].forEach(c=>c.classList.toggle("on", c===b));
+    on(b); rerender();
+  });
+}
+seg("segSize", b=>{ S.w=+b.dataset.w; S.h=+b.dataset.h; });
+seg("segFmt", b=> S.fmt=b.dataset.fmt);
+seg("segContrast", b=> S.contrast=+b.dataset.v);
+seg("segInvert", b=> S.invert=+b.dataset.v);
+document.getElementById("fit").addEventListener("change", e=>{S.fit=e.target.value;rerender();});
+document.getElementById("mode").addEventListener("change", e=>{
+  S.mode=e.target.value; S.files.forEach(f=>{delete f.mode;}); rerender();  // global change resets per-image overrides
+});
+
+// ---------- file intake ----------
+const drop=document.getElementById("drop"), fileInput=document.getElementById("file");
+drop.addEventListener("click", ()=>fileInput.click());
+fileInput.addEventListener("change", e=>addFiles(e.target.files));
+["dragover","dragenter"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add("over");}));
+["dragleave","drop"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove("over");}));
+drop.addEventListener("drop", e=>{ if(e.dataTransfer?.files) addFiles(e.dataTransfer.files); });
+document.getElementById("clear").addEventListener("click", ()=>{S.files=[];render();});
+press(document.getElementById("clear")); press(document.getElementById("dlAll"));
+
+// Which reader a given pixel size was authored for (null = neither/custom).
+function deviceForSize(w,h){
+  if(w===528&&h===792) return "X3";
+  if(w===480&&h===800) return "X4";
+  return null;
+}
+
+// Decode a .pxc buffer (4-byte LE width,height header + 2bpp MSB-first, 4 gray
+// levels) into a data URL + its native dimensions. Returns null if malformed.
+function parsePxc(buf){
+  if(buf.byteLength<4) return null;
+  const dv=new DataView(buf), bytes=new Uint8Array(buf);
+  const w=dv.getUint16(0,true), h=dv.getUint16(2,true);
+  if(w<1||h<1||w>4096||h>4096) return null;
+  const stride=(w+3)>>2;
+  if(buf.byteLength < 4+stride*h) return null;
+  const c=document.createElement("canvas"); c.width=w; c.height=h;
+  const ctx=c.getContext("2d"), im=ctx.createImageData(w,h), d=im.data;
+  for(let y=0;y<h;y++){ const row=4+y*stride;
+    for(let x=0;x<w;x++){ const q=(bytes[row+(x>>2)]>>(6-((x&3)<<1)))&3, v=LEVELS[q], p=(y*w+x)*4;
+      d[p]=d[p+1]=d[p+2]=v; d[p+3]=255; } }
+  ctx.putImageData(im,0,0);
+  return { w, h, dataURL:c.toDataURL() };
+}
+
+const GALLERY_PREVIEW_WIDTH=240;
+function previewPxc(buf){
+  if(buf.byteLength<4) return null;
+  const dv=new DataView(buf),bytes=new Uint8Array(buf);
+  const w=dv.getUint16(0,true),h=dv.getUint16(2,true),stride=(w+3)>>2;
+  if(w<1||h<1||buf.byteLength<4+stride*h) return null;
+  const pw=Math.min(w,GALLERY_PREVIEW_WIDTH),ph=Math.round(h*pw/w);
+  const canvas=document.createElement("canvas"); canvas.width=pw; canvas.height=ph;
+  const ctx=canvas.getContext("2d"),image=ctx.createImageData(pw,ph),data=image.data;
+  for(let y=0;y<ph;y++){
+    const sy=Math.min(h-1,Math.floor(y*h/ph)),row=4+sy*stride;
+    for(let x=0;x<pw;x++){
+      const sx=Math.min(w-1,Math.floor(x*w/pw));
+      const q=(bytes[row+(sx>>2)]>>(6-((sx&3)<<1)))&3,v=LEVELS[q],p=(y*pw+x)*4;
+      data[p]=data[p+1]=data[p+2]=v; data[p+3]=255;
+    }
+  }
+  ctx.putImageData(image,0,0);
+  return {w,h,canvas};
+}
+
+function addFiles(list){
+  const arr=[...list];
+  const imgs=arr.filter(f=>f.type.startsWith("image/"));
+  const pxcs=arr.filter(f=>!f.type.startsWith("image/") && /\.pxc$/i.test(f.name));
+  let pending=imgs.length+pxcs.length; if(!pending) return;
+  const done=()=>{ if(--pending===0) render(); };
+  imgs.forEach(f=>{
+    const img=new Image();
+    img.onload=()=>{ S.files.push({name:f.name, img}); done(); };
+    img.onerror=done;
+    img.src=URL.createObjectURL(f);
+  });
+  pxcs.forEach(f=>{
+    const r=new FileReader();
+    r.onload=()=>{
+      const parsed=parsePxc(r.result);
+      if(!parsed){ done(); return; }
+      const img=new Image();
+      // Wait for the decoded bitmap to load so toGray() sees its natural size.
+      img.onload=()=>{
+        S.files.push({name:f.name, img, srcW:parsed.w, srcH:parsed.h,
+                      srcDevice:deviceForSize(parsed.w,parsed.h)});
+        done();
+      };
+      img.onerror=done;
+      img.src=parsed.dataURL;
+    };
+    r.onerror=done;
+    r.readAsArrayBuffer(f);
+  });
+}
+
+// ---------- image processing ----------
+// Draw the source into a w×h grayscale Float array using the fit mode.
+function toGray(img){
+  const {w,h,fit}=S;
+  const c=document.createElement("canvas"); c.width=w; c.height=h;
+  const ctx=c.getContext("2d"); ctx.imageSmoothingQuality="high";
+  ctx.fillStyle="#fff"; ctx.fillRect(0,0,w,h);
+  const iw=img.naturalWidth, ih=img.naturalHeight;
+  let dw=w,dh=h,dx=0,dy=0;
+  if(fit==="cover"){ const s=Math.max(w/iw,h/ih); dw=iw*s; dh=ih*s; dx=(w-dw)/2; dy=(h-dh)/2; }
+  else if(fit==="fit"){ const s=Math.min(w/iw,h/ih); dw=iw*s; dh=ih*s; dx=(w-dw)/2; dy=(h-dh)/2; }
+  ctx.drawImage(img,dx,dy,dw,dh);
+  const d=ctx.getImageData(0,0,w,h).data;
+  const g=new Float32Array(w*h);
+  for(let i=0,p=0;i<g.length;i++,p+=4){
+    // Rec.601 luma
+    g[i]=0.299*d[p]+0.587*d[p+1]+0.114*d[p+2];
+  }
+  return g;
+}
+
+// Percentile-stretch contrast to the full 0..255 range.
+function autoContrast(g){
+  const hist=new Uint32Array(256);
+  for(let i=0;i<g.length;i++) hist[g[i]|0]++;
+  const total=g.length, clip=total*0.005; // ignore darkest/brightest 0.5%
+  let lo=0,hi=255,acc=0;
+  for(let v=0;v<256;v++){ acc+=hist[v]; if(acc>clip){lo=v;break;} }
+  acc=0; for(let v=255;v>=0;v--){ acc+=hist[v]; if(acc>clip){hi=v;break;} }
+  if(hi<=lo) return g;
+  const scale=255/(hi-lo);
+  for(let i=0;i<g.length;i++){ let v=(g[i]-lo)*scale; g[i]=v<0?0:v>255?255:v; }
+  return g;
+}
+
+// Decide dither vs threshold from tonal richness.
+function autoWantsDither(g){
+  const hist=new Uint32Array(256);
+  for(let i=0;i<g.length;i++) hist[g[i]|0]++;
+  const min=g.length*0.001; let tones=0;
+  for(let v=0;v<256;v++) if(hist[v]>min) tones++;
+  // Many populated tones => photographic => dither.
+  return tones>40;
+}
+
+function nearestLevel(v){ return v>=212?3:v>=127?2:v>=42?1:0; }
+
+// The panel has four levels 85 apart, so a single mis-fired pixel is not a
+// subtle speckle: it is a whole grey step away from its neighbours. Plain
+// Floyd-Steinberg produces exactly that on a large area whose tone sits near,
+// but not on, one of the four levels — the residual error has nowhere to go, so
+// it accumulates until it tips one pixel to the next level, over and over. On a
+// near-white background that reads as grit.
+//
+// Three constants govern the cure. A field counts as flat only when BOTH the
+// local spread of a lightly blurred copy stays within FLAT_TOL and the spread of
+// the raw pixels stays within RAW_TOL. The blur is what lets the test see past
+// sensor grain, so a noisy sky still counts as flat — but on its own the blur is
+// a trap: a line thinner than the blur kernel is smeared into a locally uniform
+// band and would be read as flat, then snapped away. The raw check is what saves
+// it, because a hairline's own neighbourhood spans the full distance from the
+// line to its background. A flat field within SNAP_TOL of a level is pulled onto
+// that level and its error discarded. Because the snap only reaches SNAP_TOL, a
+// region that drifts out of range meets ordinary dithering at its edge rather
+// than a hard band.
+const FLAT_TOL = 6;
+const RAW_TOL = 24;   // well under the 85 between levels, so no real edge hides
+const SNAP_TOL = 28;
+
+// 3x3 box mean, then the 3x3 spread of both that mean and the original. Returns
+// the blur too, because the quantiser wants the settled tone rather than one raw
+// pixel when it decides which level a flat field belongs to.
+function flatField(g,w,h){
+  const blur=new Float32Array(w*h), flat=new Uint8Array(w*h);
+  for(let y=0;y<h;y++) for(let x=0;x<w;x++){
+    let sum=0,n=0;
+    for(let dy=-1;dy<=1;dy++){ const yy=y+dy; if(yy<0||yy>=h) continue;
+      for(let dx=-1;dx<=1;dx++){ const xx=x+dx; if(xx<0||xx>=w) continue; sum+=g[yy*w+xx]; n++; } }
+    blur[y*w+x]=sum/n;
+  }
+  for(let y=0;y<h;y++) for(let x=0;x<w;x++){
+    let blo=Infinity,bhi=-Infinity,rlo=Infinity,rhi=-Infinity;
+    for(let dy=-1;dy<=1;dy++){ const yy=y+dy; if(yy<0||yy>=h) continue;
+      for(let dx=-1;dx<=1;dx++){ const xx=x+dx; if(xx<0||xx>=w) continue;
+        const j=yy*w+xx, bv=blur[j], rv=g[j];
+        if(bv<blo)blo=bv; if(bv>bhi)bhi=bv;
+        if(rv<rlo)rlo=rv; if(rv>rhi)rhi=rv; } }
+    flat[y*w+x]=((bhi-blo)<=FLAT_TOL && (rhi-rlo)<=RAW_TOL)?1:0;
+  }
+  return {blur,flat};
+}
+
+// Quantise gray -> level indices 0..3 (w*h Uint8).
+// Dithering is Atkinson rather than Floyd-Steinberg: it hands on only six
+// eighths of each error, so a residual decays instead of building without
+// limit. The scan is serpentine (alternating row direction), which breaks the
+// diagonal worms a fixed left-to-right pass leaves behind. Flat fields near a
+// level are snapped, as described above.
+function quantize(g, dither){
+  const {w,h}=S; const idx=new Uint8Array(w*h);
+  if(!dither){ for(let i=0;i<g.length;i++) idx[i]=nearestLevel(g[i]); return idx; }
+  const {blur,flat}=flatField(g,w,h);
+  const buf=Float32Array.from(g);
+  for(let y=0;y<h;y++){
+    const ltr=(y&1)===0, fwd=ltr?1:-1;
+    for(let k=0;k<w;k++){
+      const x=ltr?k:w-1-k, i=y*w+x;
+      const near=nearestLevel(blur[i]);
+      if(flat[i] && Math.abs(blur[i]-LEVELS[near])<=SNAP_TOL){
+        idx[i]=near;              // solid field: take the level, drop the error
+        continue;
+      }
+      const old=buf[i], q=nearestLevel(old); idx[i]=q;
+      const e=(old-LEVELS[q])/8;  // Atkinson: 1/8 to each of six neighbours
+      const x1=x+fwd, x2=x+fwd*2, xb=x-fwd;
+      if(x1>=0&&x1<w) buf[i+fwd]+=e;
+      if(x2>=0&&x2<w) buf[i+fwd*2]+=e;
+      if(y+1<h){ const n=i+w;
+        if(xb>=0&&xb<w) buf[n-fwd]+=e;
+        buf[n]+=e;
+        if(x1>=0&&x1<w) buf[n+fwd]+=e; }
+      if(y+2<h) buf[i+2*w]+=e;
+    }
+  }
+  return idx;
+}
+
+// Strip stray specks out of an image that is ALREADY quantised, for files
+// converted before the dithering above existed. A speck is an island of at most
+// MAX_SPECKLE same-level pixels sitting completely enclosed by one single other
+// level; it is filled with that surrounding level.
+//
+// Both halves of that test earn their place. Judging each pixel by its own
+// neighbours instead is the obvious approach and it is wrong: the last pixel of
+// a line has seven background neighbours and one of its own level, so any
+// neighbour-counting rule eats it, then eats the new last pixel on the next run,
+// and a line shrinks from its ends every time the cleaner is used. Measuring the
+// island closes that off, because a line is one long island however thin it is.
+// Requiring a single uniform surround is what keeps the pass to flat areas: a
+// few pixels on a boundary between two levels are structure, not grit.
+//
+// Every read is from the input, so one call is one simultaneous pass, and a
+// second call changes nothing the first one left.
+const MAX_SPECKLE = 4;
+function despeckleIdx(idx,w,h){
+  const out=Uint8Array.from(idx), seen=new Uint8Array(w*h);
+  for(let y=1;y<h-1;y++) for(let x=1;x<w-1;x++){
+    const start=y*w+x;
+    if(seen[start]) continue;
+    const level=idx[start];
+
+    // Grow the island, abandoning it the moment it is too big to be grit. That
+    // early exit is what keeps a long line cheap: a handful of steps, not a
+    // walk of its whole length.
+    const island=[start]; seen[start]=1;
+    let head=0, tooBig=false;
+    while(head<island.length){
+      const p=island[head++], py=(p/w)|0, px=p-py*w;
+      for(let dy=-1;dy<=1;dy++){ const ny=py+dy; if(ny<0||ny>=h) continue;
+        for(let dx=-1;dx<=1;dx++){ const nx=px+dx;
+          if((dx===0&&dy===0)||nx<0||nx>=w) continue;
+          const q=ny*w+nx;
+          if(idx[q]===level && !seen[q]){ seen[q]=1; island.push(q); } } }
+      if(island.length>MAX_SPECKLE){ tooBig=true; break; }
+    }
+    if(tooBig) continue;
+
+    // The island must not touch the border, and everything around it must be one
+    // single other level. This is also what makes an abandoned fill safe: the
+    // members of a big island that were never reached can be seeded again later
+    // and look small alone, but such a fragment always has a neighbour of its
+    // own level just outside itself, which fails the uniform-surround test.
+    const members=new Set(island);
+    let surround=-1, enclosed=true;
+    outer:
+    for(const p of island){
+      const py=(p/w)|0, px=p-py*w;
+      if(px===0||py===0||px===w-1||py===h-1){ enclosed=false; break; }
+      for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++){
+        const q=(py+dy)*w+(px+dx);
+        if(members.has(q)) continue;
+        if(surround<0) surround=idx[q];
+        else if(idx[q]!==surround){ enclosed=false; break outer; }
+      }
+    }
+    if(!enclosed||surround<0||surround===level) continue;
+
+    for(const p of island) out[p]=surround;
+  }
+  return out;
+}
+
+// ---------- encoders ----------
+function encodePxc(idx,invert){
+  const {w,h}=S, stride=(w+3)>>2, out=new Uint8Array(4+stride*h);
+  out[0]=w&255; out[1]=(w>>8)&255; out[2]=h&255; out[3]=(h>>8)&255;
+  for(let y=0;y<h;y++){ const row=4+y*stride;
+    for(let x=0;x<w;x++){ let q=idx[y*w+x]; if(invert)q=3-q;
+      out[row+(x>>2)] |= q<<(6-((x&3)<<1)); } }
+  return out;
+}
+function encodeBmp(idx){
+  const {w,h}=S, rowBytes=(((w*2)+31)>>5)<<2, dataSize=rowBytes*h, off=14+40+16, size=off+dataSize;
+  const b=new Uint8Array(size), dv=new DataView(b.buffer);
+  b[0]=0x42;b[1]=0x4D; dv.setUint32(2,size,true); dv.setUint32(10,off,true);
+  dv.setUint32(14,40,true); dv.setInt32(18,w,true); dv.setInt32(22,h,true);
+  dv.setUint16(26,1,true); dv.setUint16(28,2,true);
+  dv.setUint32(34,dataSize,true); dv.setUint32(46,4,true); dv.setUint32(50,4,true);
+  for(let i=0;i<4;i++){ const p=54+i*4, g=LEVELS[i]; b[p]=g;b[p+1]=g;b[p+2]=g;b[p+3]=0; }
+  for(let y=0;y<h;y++){ const srcY=h-1-y, row=off+y*rowBytes; // BMP is bottom-up
+    for(let x=0;x<w;x++){ const q=idx[srcY*w+x]&3; b[row+(x>>2)] |= q<<(6-((x&3)<<1)); } }
+  return b;
+}
+
+// ---------- convert one file ----------
+function convert(f){
+  let g=toGray(f.img);
+  if(S.contrast) g=autoContrast(g);
+  // A per-image override (set by clicking the badge) wins over the global mode.
+  let dither = f.mode ? (f.mode==="dither")
+             : S.mode==="dither" ? true : S.mode==="threshold" ? false : autoWantsDither(g);
+  const idx=quantize(g,dither);
+  const bytes = S.fmt==="pxc" ? encodePxc(idx,S.invert) : encodeBmp(idx);
+  let base = f.name.replace(/\.[^.]+$/,"");
+  // A .pxc carries no record of which reader it was fitted for, and the two are not
+  // interchangeable, so the target goes in the name. Any suffix already there is
+  // dropped first: re-targeting an X3 file to an X4 must read wall_X4, not wall_X3_X4.
+  if(S.fmt==="pxc"){
+    const target = deviceForSize(S.w,S.h);
+    if(target){ base = base.replace(/_(X3|X4)$/i,"") + "_" + target; }
+  }
+  return { idx, bytes, dither, filename: base+"."+S.fmt };
+}
+
+// ---------- render UI ----------
+const results=document.getElementById("results"), bar=document.getElementById("bar"),
+      countEl=document.getElementById("count"),
+      downloadProgress=document.getElementById("downloadProgress"),
+      downloadProgressFill=document.getElementById("downloadProgressFill"),
+      downloadProgressText=document.getElementById("downloadProgressText"),
+      downloadProgressPercent=document.getElementById("downloadProgressPercent");
+
+function drawPreview(canvas, idx){
+  const {w,h}=S; canvas.width=w; canvas.height=h;
+  const ctx=canvas.getContext("2d"), im=ctx.createImageData(w,h), d=im.data;
+  for(let i=0,p=0;i<idx.length;i++,p+=4){ const v=LEVELS[idx[i]]; d[p]=d[p+1]=d[p+2]=v; d[p+3]=255; }
+  ctx.putImageData(im,0,0);
+}
+
+// Build one result card. The dither/threshold badge is a button: clicking it
+// flips this image's rendering and re-renders just this card, leaving others
+// (and their overrides) untouched. conv is cached on the file for Download all.
+function buildCard(f){
+  const conv=convert(f); f.conv=conv;
+  const card=document.createElement("div"); card.className="card";
+  const cv=document.createElement("canvas"); card.appendChild(cv); drawPreview(cv,conv.idx);
+  const name=document.createElement("div"); name.className="name"; name.textContent=conv.filename;
+  const meta=document.createElement("div"); meta.className="meta";
+  const tag=document.createElement("button"); tag.type="button"; tag.className="pill pill-toggle";
+  tag.textContent=(conv.dither?"dither":"threshold")+" ⇄";
+  tag.title="Switch rendering (dither ↔ threshold)";
+  tag.addEventListener("click", ()=>{
+    f.mode = conv.dither ? "threshold" : "dither";   // toggle this image only
+    card.replaceWith(buildCard(f));
+  });
+  const dims=document.createElement("span"); dims.textContent=`${S.w}×${S.h}`;
+  const kb=document.createElement("span"); kb.textContent=`${(conv.bytes.length/1024).toFixed(0)} KB`;
+  meta.append(tag,dims,kb);
+  // For a .pxc that was dropped in, show which reader it was authored for and,
+  // when the chosen screen differs, that it's being re-targeted to the other one.
+  if(f.srcW){
+    const from = f.srcDevice ? f.srcDevice : `${f.srcW}×${f.srcH}`;
+    const to = deviceForSize(S.w,S.h);
+    const src=document.createElement("span"); src.className="pill pill-src";
+    src.textContent = (to && f.srcDevice && to!==f.srcDevice) ? `${from} → ${to}` : `from ${from}`;
+    meta.append(src);
+  }
+  const a=document.createElement("a"); a.className="dl"; a.textContent="Download";
+  a.href=URL.createObjectURL(new Blob([conv.bytes],{type:"application/octet-stream"})); a.download=conv.filename;
+  press(a);
+  card.append(name,meta,a);
+  a.addEventListener("click", ()=>showDownloadProgress(1,1,`Downloading ${conv.filename}`));
+  return card;
+}
+
+function render(){
+  results.innerHTML="";
+  bar.hidden = S.files.length===0;
+  if(!S.files.length) hideDownloadProgress();
+  countEl.textContent = S.files.length ? `${S.files.length} image${S.files.length>1?"s":""} · ${S.w}×${S.h} · ${S.fmt.toUpperCase()}` : "";
+  S.files.forEach(f=>results.appendChild(buildCard(f)));
+}
+function rerender(){ if(S.files.length) render(); }
+
+let downloadProgressTimer=0;
+function hideDownloadProgress(){
+  if(downloadProgressTimer) clearTimeout(downloadProgressTimer);
+  downloadProgress.hidden=true;
+  downloadProgress.classList.remove("done");
+  downloadProgressFill.style.width="0%";
+  downloadProgress.setAttribute("aria-valuenow","0");
+  downloadProgressText.textContent="Ready to download";
+  downloadProgressPercent.textContent="0%";
+}
+function showDownloadProgress(done,total,label){
+  if(downloadProgressTimer) clearTimeout(downloadProgressTimer);
+  const pct=total ? Math.round((done/total)*100) : 0;
+  downloadProgress.hidden=false;
+  downloadProgress.classList.toggle("done",pct>=100);
+  downloadProgressFill.style.width=`${pct}%`;
+  downloadProgress.setAttribute("aria-valuenow",String(pct));
+  downloadProgressText.textContent=label || (pct>=100 ? "Download complete" : "Downloading…");
+  downloadProgressPercent.textContent=`${pct}%`;
+  if(pct>=100) downloadProgressTimer=setTimeout(()=>{downloadProgress.hidden=true;},2200);
+}
+
+document.getElementById("dlAll").addEventListener("click", ()=>{
+  const downloadable=S.files.filter(f=>f.conv);
+  if(!downloadable.length) return;
+  showDownloadProgress(0,downloadable.length,`Starting ${downloadable.length} downloads`);
+  downloadable.forEach((f,i)=>setTimeout(()=>{
+    if(!f.conv) return;
+    const a=document.createElement("a");
+    a.href=URL.createObjectURL(new Blob([f.conv.bytes],{type:"application/octet-stream"}));
+    a.download=f.conv.filename; a.click();
+    showDownloadProgress(i+1,downloadable.length,
+      i+1===downloadable.length ? "Downloads complete" : `Downloading ${i+1} of ${downloadable.length}`);
+  }, i*150));
+});
+
+// ---------- cleaner ----------
+// Works on finished files rather than source images, so nothing here goes near
+// toGray / autoContrast / quantize. A file is unpacked to level indices,
+// despeckled, and packed again at its own width and height in its own format.
+
+// Unpack a .pxc (4-byte LE width,height header, then 2bpp MSB-first).
+function decodePxcIdx(buf){
+  if(buf.byteLength<4) return null;
+  const dv=new DataView(buf), bytes=new Uint8Array(buf);
+  const w=dv.getUint16(0,true), h=dv.getUint16(2,true);
+  if(w<1||h<1||w>4096||h>4096) return null;
+  const stride=(w+3)>>2;
+  if(buf.byteLength<4+stride*h) return null;
+  const idx=new Uint8Array(w*h);
+  for(let y=0;y<h;y++){ const row=4+y*stride;
+    for(let x=0;x<w;x++) idx[y*w+x]=(bytes[row+(x>>2)]>>(6-((x&3)<<1)))&3; }
+  return {w,h,idx};
+}
+
+// Unpack the 2-bit, 4-gray BMP this page writes. Rows are bottom-up and padded
+// to four bytes. The palette is read rather than assumed, so a file whose four
+// entries are stored in another order still maps onto our level indices.
+function decodeBmpIdx(buf){
+  if(buf.byteLength<54) return null;
+  const dv=new DataView(buf), bytes=new Uint8Array(buf);
+  if(bytes[0]!==0x42||bytes[1]!==0x4D) return null;
+  const off=dv.getUint32(10,true), headerSize=dv.getUint32(14,true);
+  const w=dv.getInt32(18,true), rawH=dv.getInt32(22,true);
+  const bpp=dv.getUint16(28,true), compression=dv.getUint32(30,true);
+  if(bpp!==2||compression!==0) return null;
+  const h=Math.abs(rawH), topDown=rawH<0;
+  if(w<1||h<1||w>4096||h>4096) return null;
+  const rowBytes=(((w*2)+31)>>5)<<2;
+  if(buf.byteLength<off+rowBytes*h) return null;
+  // Map each palette entry to the nearest of our four levels.
+  const palette=new Uint8Array(4);
+  for(let i=0;i<4;i++){
+    const p=14+headerSize+i*4;
+    const gray=p+2<buf.byteLength ? (0.299*bytes[p+2]+0.587*bytes[p+1]+0.114*bytes[p]) : LEVELS[i];
+    palette[i]=nearestLevel(gray);
+  }
+  const idx=new Uint8Array(w*h);
+  for(let y=0;y<h;y++){
+    const srcY=topDown?y:h-1-y, row=off+y*rowBytes;
+    for(let x=0;x<w;x++) idx[srcY*w+x]=palette[(bytes[row+(x>>2)]>>(6-((x&3)<<1)))&3];
+  }
+  return {w,h,idx};
+}
+
+// Pack level indices at an explicit size, borrowing the converter's encoders
+// without disturbing whatever the Converter tab is currently set to.
+function packAtSize(idx,w,h,fmt){
+  const saved={w:S.w,h:S.h};
+  S.w=w; S.h=h;
+  try{ return fmt==="bmp" ? encodeBmp(idx) : encodePxc(idx,0); }
+  finally{ Object.assign(S,saved); }
+}
+
+const CLEAN_BROWSER_LIMIT = 100;
+const cleanState={files:[]};
+const cleanResults=document.getElementById("cleanResults");
+const cleanBar=document.getElementById("cleanBar");
+const cleanCount=document.getElementById("cleanCount");
+
+function cleanDrawPreview(canvas,idx,w,h){
+  canvas.width=w; canvas.height=h;
+  const ctx=canvas.getContext("2d"), im=ctx.createImageData(w,h), d=im.data;
+  for(let i=0,p=0;i<idx.length;i++,p+=4){ const v=LEVELS[idx[i]]; d[p]=d[p+1]=d[p+2]=v; d[p+3]=255; }
+  ctx.putImageData(im,0,0);
+}
+
+function cleanRender(){
+  cleanResults.innerHTML="";
+  cleanBar.hidden=cleanState.files.length===0;
+  const changed=cleanState.files.reduce((n,f)=>n+(f.changed?1:0),0);
+  cleanCount.textContent=cleanState.files.length
+    ? `${cleanState.files.length} file${cleanState.files.length>1?"s":""} · ${changed} cleaned`
+    : "";
+  cleanState.files.forEach(f=>{
+    const card=document.createElement("div"); card.className="card";
+    const cv=document.createElement("canvas");
+    cleanDrawPreview(cv,f.idx,f.w,f.h);
+    const name=document.createElement("div"); name.className="name"; name.textContent=f.name;
+    const meta=document.createElement("div"); meta.className="meta";
+    const tag=document.createElement("span"); tag.className="pill";
+    tag.textContent=f.changed?`${f.changed} pixels cleaned`:"already clean";
+    const dims=document.createElement("span"); dims.textContent=`${f.w}×${f.h}`;
+    meta.append(tag,dims);
+    const a=document.createElement("a"); a.className="dl"; a.textContent="Download";
+    a.href=URL.createObjectURL(new Blob([f.bytes],{type:"application/octet-stream"}));
+    a.download=f.name;
+    press(a);
+    card.append(cv,name,meta,a);
+    cleanResults.appendChild(card);
+  });
+}
+
+function cleanAddFiles(list){
+  const arr=[...list].filter(f=>/\.(pxc|bmp)$/i.test(f.name));
+  if(!arr.length) return;
+  if(arr.length>CLEAN_BROWSER_LIMIT){
+    alert(`That is ${arr.length} files. The browser handles about ${CLEAN_BROWSER_LIMIT} at a time.\n\n`+
+          `For a whole SD card, run scripts/clean_pxc.py from the repository instead. It has no limit.`);
+    return;
+  }
+  let pending=arr.length;
+  const done=()=>{ if(--pending===0) cleanRender(); };
+  arr.forEach(file=>{
+    const reader=new FileReader();
+    reader.onload=()=>{
+      const isBmp=/\.bmp$/i.test(file.name);
+      const decoded=isBmp?decodeBmpIdx(reader.result):decodePxcIdx(reader.result);
+      if(!decoded){ done(); return; }
+      const cleaned=despeckleIdx(decoded.idx,decoded.w,decoded.h);
+      let changed=0;
+      for(let i=0;i<cleaned.length;i++) if(cleaned[i]!==decoded.idx[i]) changed++;
+      cleanState.files.push({
+        name:file.name, w:decoded.w, h:decoded.h, idx:cleaned, changed,
+        bytes:packAtSize(cleaned,decoded.w,decoded.h,isBmp?"bmp":"pxc")
+      });
+      done();
+    };
+    reader.onerror=done;
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+const cleanDrop=document.getElementById("cleanDrop"), cleanFile=document.getElementById("cleanFile");
+cleanDrop.addEventListener("click",()=>cleanFile.click());
+cleanFile.addEventListener("change",e=>cleanAddFiles(e.target.files));
+cleanDrop.addEventListener("dragover",e=>{e.preventDefault();cleanDrop.classList.add("over");});
+cleanDrop.addEventListener("dragleave",()=>cleanDrop.classList.remove("over"));
+cleanDrop.addEventListener("drop",e=>{
+  e.preventDefault(); cleanDrop.classList.remove("over");
+  if(e.dataTransfer?.files) cleanAddFiles(e.dataTransfer.files);
+});
+document.getElementById("cleanClear").addEventListener("click",()=>{cleanState.files=[];cleanRender();});
+document.getElementById("cleanDlAll").addEventListener("click",()=>{
+  cleanState.files.forEach((f,i)=>setTimeout(()=>{
+    const a=document.createElement("a");
+    a.href=URL.createObjectURL(new Blob([f.bytes],{type:"application/octet-stream"}));
+    a.download=f.name; a.click();
+  }, i*150));
+});
+press(document.getElementById("cleanClear")); press(document.getElementById("cleanDlAll"));
+
+// ---------- tabs ----------
+const tabs=document.getElementById("tabs");
+const views={convert:document.getElementById("view-convert"),
+             clean:document.getElementById("view-clean"),
+             gallery:document.getElementById("view-gallery"),
+             flash:document.getElementById("view-flash")};
+let galleryLoaded=false, flashLoaded=false;
+
+// The wallpaper gallery is only present when gallery/manifest.json is being served. It was
+// removed from this site (3,190 PXC files, 324 MB) because publishing it made every Pages
+// deploy slow and fragile; scripts/import-gallery.mjs puts it back whenever wanted. Hide
+// the tab rather than let it open onto an empty grid with an error in it: a tab that leads
+// nowhere reads as a broken site, and no tab at all reads as a site without a gallery.
+(async()=>{
+  const tab=[...tabs.children].find(t=>t.dataset.view==="gallery");
+  if(!tab) return;
+  try{
+    const res=await fetch("gallery/manifest.json",{method:"HEAD",cache:"no-cache"});
+    if(res.ok) return;
+  }catch(_){}
+  tab.hidden=true;
+  // A deep link to #gallery would otherwise land on the hidden panel with no tab lit.
+  if(!views.gallery.hidden) showView("convert");
+})();
+
+function showView(v){
+  if(!views[v]) v="convert";
+  [...tabs.children].forEach(t=>{const on=t.dataset.view===v; t.classList.toggle("on",on); t.setAttribute("aria-selected",on);});
+  Object.keys(views).forEach(k=>{ views[k].hidden = k!==v; });
+  if(v==="gallery" && !galleryLoaded){ galleryLoaded=true; loadGallery(); }
+  if(v==="flash" && !flashLoaded){ flashLoaded=true; initFlasher(); }
+}
+
+tabs.addEventListener("click", e=>{
+  const b=e.target.closest(".tab"); if(!b) return;
+  showView(b.dataset.view);
+  if(b.dataset.view==="flash"){ history.replaceState(null,"","#flash"); }
+});
+
+// ---------- flasher (esptool-js) ----------
+// esptool-js writes raw partitions over Web Serial. Unlike a fresh-install
+// browser flasher, it can write the app WITHOUT a full-chip erase, so an Update keeps the user's books,
+// settings and Wi-Fi. Rescue passes eraseAll:true for a from-scratch reflash.
+// Pinned to 0.5.7: esptool-js 0.6.0 broke compressed writes with a
+// "status 201,0" failure mid-image (espressif/esptool-js#233). 0.5.7 works.
+const FLASH_ENGINE="https://unpkg.com/esptool-js@0.5.7/bundle.js";
+let esptoolMod=null;
+const flashState={busy:false};
+
+function initFlasher(){
+  fetch("flash/version.txt",{cache:"no-cache"})
+    .then(r=>r.ok?r.text():Promise.reject(r.status))
+    .then(t=>{document.getElementById("flashVersion").textContent=t.trim()||"?";})
+    .catch(()=>{document.getElementById("flashVersion").textContent="unknown";});
+  fetch("flash/firmware/latest/bootloader.bin",{method:"HEAD"})
+    .then(r=>{if(!r.ok) throw 0;})
+    .catch(()=>{document.getElementById("flashRescueMissing").hidden=false;});
+  // The experimental build is published separately from the stable one, so the
+  // section hides itself whenever that folder is absent rather than offering a
+  // button that would fail on click.
+  fetch("flash/experimental-version.txt",{cache:"no-cache"})
+    .then(r=>r.ok?r.text():Promise.reject(r.status))
+    .then(t=>{
+      document.getElementById("flashExperimentalVersion").textContent=t.trim()||"?";
+      // The panel ships hidden and is revealed only once a build is actually published,
+      // so an empty channel shows nothing rather than a button that would fail on click.
+      // Without this it stayed hidden forever and the build was unreachable.
+      document.getElementById("experimentalPanel").hidden=false;
+    })
+    .catch(()=>{
+      document.getElementById("flashExperimentalVersion").textContent="not published";
+      document.getElementById("flashExperimentalMissing").hidden=false;
+      document.getElementById("btnExperimental").disabled=true;
+    });
+  if(!("serial" in navigator)){ document.getElementById("flashUnsupported").hidden=false; }
+  // Update serves the current Lector build (the C++ core + Rust helpers).
+  document.getElementById("btnUpdate").addEventListener("click",()=>runFlash("update"));
+  document.getElementById("btnExperimental").addEventListener("click",()=>{
+    if(confirm("This build has not been tested on a device. It replaces your unlock footer with wake timing "+
+               "numbers. That is deliberate and only "+
+               "happens in this build; the stable build never shows them. It also carries the newer display SDK "+
+               "and a faster unlock. Your books keep their layout: nothing is rebuilt, and reading positions, "+
+               "quotes and per-book settings are kept. You can go back at any time with the Update button. "+
+               "Continue?")) runFlash("experimental");
+  });
+  document.getElementById("btnRescue").addEventListener("click",()=>{
+    if(confirm("Full install / rescue flash ERASES the entire device, including any books and settings in flash. "+
+               "This installs Lector on a new device, or revives one that will not boot. "+
+               "On a brand-new reader there is nothing of yours to lose. Continue?")) runFlash("rescue");
+  });
+}
+
+// Convert a byte array to the binary string esptool-js expects, in chunks so we
+// never blow the argument limit of String.fromCharCode on a multi-MB image.
+function bytesToBinaryString(u8){
+  let out=""; const CHUNK=0x8000;
+  for(let i=0;i<u8.length;i+=CHUNK){ out+=String.fromCharCode.apply(null,u8.subarray(i,i+CHUNK)); }
+  return out;
+}
+
+async function fetchBinary(path){
+  const r=await fetch(path,{cache:"no-cache"});
+  if(!r.ok) throw new Error("cannot load "+path+" ("+r.status+")");
+  return new Uint8Array(await r.arrayBuffer());
+}
+
+async function runFlash(mode){
+  if(flashState.busy) return;
+  // Full installs erase; the two Update modes keep flash contents (write app only).
+  const erase = mode==="rescue";
+  const wrap=document.getElementById("flashProgressWrap");
+  const bar=document.getElementById("flashBar");
+  const statusEl=document.getElementById("flashStatus");
+  const logEl=document.getElementById("flashLog");
+  const log=(m)=>{ logEl.textContent+=m+"\n"; logEl.scrollTop=logEl.scrollHeight; };
+  const setStatus=(m)=>{ statusEl.textContent=m; };
+  const setPct=(p)=>{ bar.style.width=Math.max(0,Math.min(100,p))+"%"; };
+
+  if(!("serial" in navigator)){ document.getElementById("flashUnsupported").hidden=false; return; }
+
+  // Put the progress box directly under the button that was pressed. It used to live
+  // at the bottom of the tab, so starting a flash from the Update button meant
+  // scrolling past two other sections to find out what was happening. The node is
+  // MOVED, not copied, so there is still exactly one progress box and no second copy
+  // of its state to keep in step.
+  const anchorBtn=document.getElementById(
+    erase ? "btnRescue" : mode==="experimental" ? "btnExperimental" : "btnUpdate");
+  const anchor=anchorBtn && anchorBtn.closest(".actions");
+  if(anchor && anchor.nextElementSibling!==wrap) anchor.after(wrap);
+
+  wrap.hidden=false; logEl.textContent=""; setPct(0);
+  // Only scrolls when the box is genuinely off-screen, so a flash started with the
+  // button already in view does not make the page jump.
+  wrap.scrollIntoView({block:"nearest"});
+  setStatus("Loading firmware…");
+
+  // Load the parts named by the manifest (paths are relative to /flash/).
+  let parts;
+  try{
+    const manifestPath = erase ? "flash/manifest-full.json"
+                       : mode==="experimental" ? "flash/manifest-experimental.json"
+                       : "flash/manifest-update.json";
+    const manifest=await (await fetch(manifestPath,{cache:"no-cache"})).json();
+    parts=[];
+    for(const p of manifest.builds[0].parts){
+      log("load "+p.path);
+      const u8=await fetchBinary("flash/"+p.path);
+      parts.push({ data:bytesToBinaryString(u8), address:p.offset });
+    }
+  }catch(err){ setStatus("Could not load the firmware files."); log("ERROR: "+(err.message||err)); return; }
+
+  // Pull in esptool-js on first use.
+  let ESPLoader, Transport;
+  try{
+    if(!esptoolMod) esptoolMod=await import(FLASH_ENGINE);
+    ({ ESPLoader, Transport }=esptoolMod);
+  }catch(err){ setStatus("Could not load the flasher engine."); log("ERROR: "+(err.message||err)); return; }
+
+  let transport;
+  try{
+    flashState.busy=true; setButtonsDisabled(true);
+    setStatus("Pick your reader's serial port…");
+    const port=await navigator.serial.requestPort();
+    transport=new Transport(port, true);
+    const loader=new ESPLoader({ transport, baudrate:460800, romBaudrate:115200,
+      terminal:{ clean(){}, writeLine(d){log(d);}, write(){} } });
+    setStatus("Connecting to the reader…");
+    const chip=await loader.main();
+    log("Detected chip: "+chip);
+    setStatus(erase?"Erasing and writing (full flash)…":"Writing update (no erase)…");
+    await loader.writeFlash({
+      fileArray:parts,
+      flashSize:"keep",
+      eraseAll:erase,
+      compress:true,
+      reportProgress:(idx,written,total)=>{
+        const pct=Math.round((written/total)*100);
+        setPct(pct);
+        const label = erase ? "Full flash" : mode==="experimental" ? "Experimental" : "Update";
+        setStatus(label+" — part "+(idx+1)+"/"+parts.length+" — "+pct+"%");
+      },
+    });
+    setPct(100);
+    log("Write complete.");
+    // The write is finished and durable at this point. A USB hard reset does nothing
+    // on the X3/X4 — they ignore the RTS/DTR reboot line — so we do NOT rely on it.
+    // Try it silently in case some board honours it, then always tell the user to
+    // reboot the reader by hand. esptool-js 0.5.7 exposes the reset via loader.after().
+    try{
+      if(typeof loader.after==="function"){ await loader.after("hard_reset"); }
+      else if(typeof loader.hardReset==="function"){ await loader.hardReset(); }
+      else if(transport&&transport.setRTS){
+        await transport.setRTS(true); await new Promise(r=>setTimeout(r,120)); await transport.setRTS(false);
+      }
+    }catch(resetErr){
+      log("Auto-reset unavailable (expected on X3/X4): "+(resetErr&&resetErr.message?resetErr.message:resetErr));
+    }
+    setStatus("✓ Flash complete! Reboot your reader by hand: press Reset, then Power. It does not auto-reboot over USB.");
+    log("Flash complete — reboot the reader manually: Reset, then Power.");
+  }catch(err){
+    setStatus("Flash failed — see the log below.");
+    log("ERROR: "+(err&&err.message?err.message:err));
+  }finally{
+    try{ if(transport) await transport.disconnect(); }catch(_e){}
+    flashState.busy=false; setButtonsDisabled(false);
+  }
+}
+
+function setButtonsDisabled(d){
+  const u=document.getElementById("btnUpdate"); if(u) u.disabled=d;
+  const r=document.getElementById("btnRescue"); if(r) r.disabled=d;
+  const e=document.getElementById("btnExperimental"); if(e) e.disabled=d;
+}
+
+// Deep link: /#flash (or a redirect from /flash/) opens the Flasher tab directly.
+if(location.hash==="#flash"){ showView("flash"); }
+
+// ---------- gallery ----------
+// Re-encode a decoded wallpaper to a target screen+format, reusing the
+// converter pipeline. Cover-fits (a wallpaper already fills its master), skips
+// the contrast pass (tones are already placed) and lets auto pick dithering —
+// so a cross-screen resample stays smooth while a same-size re-encode stays
+// exact (auto sees 4 tones → threshold → identity). Returns packed bytes.
+function convertImageTo(img, w, h, fmt){
+  const saved={w:S.w,h:S.h,fmt:S.fmt,fit:S.fit,mode:S.mode,contrast:S.contrast,invert:S.invert};
+  S.w=w; S.h=h; S.fmt=fmt; S.fit="cover"; S.contrast=0; S.invert=0;
+  try{
+    const g=toGray(img);
+    const idx=quantize(g,autoWantsDither(g));
+    return fmt==="pxc" ? encodePxc(idx,0) : encodeBmp(idx);
+  } finally { Object.assign(S,saved); }
+}
+
+function triggerDownload(bytes, filename){
+  const a=document.createElement("a");
+  const url=URL.createObjectURL(new Blob([bytes],{type:"application/octet-stream"}));
+  a.href=url; a.download=filename; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+
+// Re-trigger the e-ink refresh flash on a canvas (restart the animation).
+function einkFlash(el){ el.style.animation="none"; void el.offsetWidth; el.style.animation="lwc-eink .55s steps(1,end)"; }
+
+async function loadGalleryMaster(entry){
+  const response=await fetch("gallery/"+entry.file);
+  if(!response.ok) throw new Error(response.status);
+  const parsed=parsePxc(await response.arrayBuffer());
+  if(!parsed) throw new Error("Invalid PXC");
+  const image=new Image();
+  await new Promise((ok,no)=>{image.onload=ok;image.onerror=no;image.src=parsed.dataURL;});
+  return image;
+}
+
+function galleryCard(entry, cv, w, h, i){
+  const base=entry.file.replace(/\.[^.]+$/,"");
+  const masterDevice=w===528&&h===792?"X3":"X4";
+  const card=document.createElement("div"); card.className="gcard";
+  card.style.animationDelay=(i*70)+"ms";
+  const frame=document.createElement("div"); frame.className="gframe";
+  const sz=document.createElement("div"); sz.className="gsize"; sz.textContent=`${w}×${h}`;
+  frame.append(cv,sz);
+  const title=document.createElement("div"); title.className="gtitle"; title.textContent=entry.title||base;
+  card.append(frame,title);
+  if(entry.credit){ const cr=document.createElement("div"); cr.className="gcredit"; cr.textContent=entry.credit; card.append(cr); }
+  // Original .pxc is served as-is (byte-for-byte the stored master).
+  const main=document.createElement("a"); main.className="gdl-main";
+  main.href="gallery/"+entry.file; main.download=entry.file;
+  main.textContent=`Download · ${masterDevice} PXC`;
+  press(main);
+  // Everything else is re-encoded on click from the decoded master.
+  const alt=document.createElement("div"); alt.className="gdl-alt";
+  [["X3 PXC",528,792,"pxc"],["X4 PXC",480,800,"pxc"],
+   ["X3 BMP",528,792,"bmp"],["X4 BMP",480,800,"bmp"]]
+    .filter(([,tw,th,fmt])=>!(fmt==="pxc"&&tw===w&&th===h))
+    .forEach(([label,tw,th,fmt])=>{
+    const btn=document.createElement("button"); btn.type="button"; btn.textContent=label;
+    btn.addEventListener("click", async()=>{
+      const label=btn.textContent; btn.disabled=true; btn.textContent="Working…";
+      try{
+        const image=await loadGalleryMaster(entry);
+        triggerDownload(convertImageTo(image,tw,th,fmt),`${base}-${tw===480?"x4":"x3"}.${fmt}`);
+      }catch(_){ btn.textContent="Failed"; await new Promise(resolve=>setTimeout(resolve,900)); }
+      finally{btn.disabled=false;btn.textContent=label;}
+    });
+    alt.appendChild(btn);
+  });
+  card.append(main,alt);
+  // Hover: lift the card and pulse the preview like an e-ink page refresh.
+  card.addEventListener("mouseenter", ()=>einkFlash(cv));
+  return card;
+}
+
+async function loadGallery(){
+  const grid=document.getElementById("ggrid"), state=document.getElementById("gstate");
+  const showState=msg=>{ state.hidden=false; state.textContent=msg; };
+  let manifest;
+  try{
+    const res=await fetch("gallery/manifest.json",{cache:"no-cache"});
+    if(!res.ok) throw new Error(res.status);
+    manifest=await res.json();
+  }catch(_){
+    showState("The gallery needs its files served over http — open the live site, or run a local server. The converter tab works offline regardless.");
+    return;
+  }
+  galleryEntries=(manifest && manifest.wallpapers) || [];
+  if(!galleryEntries.length){ showState("No wallpapers shared yet."); return; }
+  state.hidden=true;
+  await renderGalleryBatch(0);
+}
+
+const GALLERY_BATCH_SIZE=24;
+let galleryEntries=[], galleryCursor=0, galleryPageStart=0, galleryRendered=0, galleryFailures=0, galleryBusy=false;
+async function renderGalleryBatch(start){
+  if(galleryBusy) return;
+  const grid=document.getElementById("ggrid"), state=document.getElementById("gstate");
+  const actions=document.getElementById("gactions"), more=document.getElementById("gloadMore"), prev=document.getElementById("gprev");
+  const count=document.getElementById("gcount");
+  galleryPageStart=start; galleryCursor=start; galleryRendered=0; galleryFailures=0; grid.replaceChildren();
+  const batch=galleryEntries.slice(galleryCursor,galleryCursor+GALLERY_BATCH_SIZE);
+  galleryBusy=true; more.disabled=true; more.textContent="Loading…"; actions.hidden=false;
+  let shown=0;
+  for(const entry of batch){
+    try{
+      const res=await fetch("gallery/"+entry.file);
+      if(!res.ok) throw new Error(res.status);
+      const parsed=previewPxc(await res.arrayBuffer());
+      if(!parsed) continue;
+      grid.appendChild(galleryCard(entry,parsed.canvas,parsed.w,parsed.h,shown)); shown++; galleryRendered++;
+    }catch(_){ galleryFailures++; }
+  }
+  galleryCursor+=batch.length;
+  galleryBusy=false; more.disabled=false; more.textContent="Load more";
+  count.textContent=`${galleryPageStart+1}–${galleryCursor} of ${galleryEntries.length}`;
+  prev.hidden=galleryPageStart===0; more.hidden=galleryCursor>=galleryEntries.length;
+  if(galleryFailures){state.hidden=false;state.textContent=`Skipped ${galleryFailures} unreadable wallpaper${galleryFailures===1?"":"s"}.`;}
+  if(!grid.children.length){ state.hidden=false; state.textContent="Couldn't load the shared wallpapers."; }
+}
+document.getElementById("gloadMore").addEventListener("click",()=>renderGalleryBatch(galleryCursor));
+document.getElementById("gprev").addEventListener("click",()=>renderGalleryBatch(Math.max(0,galleryPageStart-GALLERY_BATCH_SIZE)));
+</script>
+</body>
+</html>

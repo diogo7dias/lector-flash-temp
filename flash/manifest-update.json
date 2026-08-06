@@ -1,0 +1,20 @@
+{
+  "name": "Lector",
+  "version": "lector 0.14.0",
+  "erase": false,
+  "builds": [
+    {
+      "chipFamily": "ESP32-C3",
+      "parts": [
+        {
+          "path": "firmware/latest/boot_app0.bin",
+          "offset": 57344
+        },
+        {
+          "path": "firmware/latest/firmware.bin",
+          "offset": 65536
+        }
+      ]
+    }
+  ]
+}
